@@ -1,16 +1,12 @@
-import { createPagesServerClient } from '@supabase/auth-helpers-nextjs';
+import { createServerComponentClient } from '@supabase/auth-helpers-nextjs';
 import { cookies } from 'next/headers';
 import { Database } from '@/types/supabase';
 import { redirect } from 'next/navigation';
 
 export async function createServerSupabaseClient() {
-  return createPagesServerClient<Database>(
-    { cookies: cookies() },
-    {
-      supabaseUrl: process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      supabaseKey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-    }
-  );
+  return createServerComponentClient<Database>({
+    cookies
+  });
 }
 
 export async function getSession() {
