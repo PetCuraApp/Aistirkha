@@ -118,10 +118,17 @@ export default function AdminPage() {
           throw new Error('No se pudieron obtener los datos del usuario');
         }
 
-        console.log('Rol del usuario:', userData.rol);
-        if (userData.rol !== 'admin') {
-          console.log('Usuario no es administrador, redirigiendo a /home');
-          // Redirigir a usuarios no administradores
+
+        if (userData && typeof userData === 'object' && 'rol' in userData) {
+          const { rol } = userData as { rol: string };
+          console.log('Rol del usuario:', rol);
+          if (rol !== 'admin') {
+            console.log('Usuario no es administrador, redirigiendo a /home');
+            router.push('/home');
+            return;
+          }
+        } else {
+          console.error('No se pudo determinar el rol del usuario');
           router.push('/home');
           return;
         }
