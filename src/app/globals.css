@@ -1,8 +1,27 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #cbb4e9;
+  --foreground: #4b2e83;
+  --input-background: #d9c9ef;
+  --input-text: #4b2e83;
+  --input-border: #7e57c2;
+  --heading-text: #6a4db3;
+  --card-background: #d9c9ef;
+  --card-border: #7e57c2;
+  --gray-50: #bda9d7;
+  --gray-100: #af9ada;
+  --gray-200: #9e8ac9;
+  --gray-300: #8d7ab9;
+  --gray-400: #7c6aa9;
+  --gray-500: #6b5a9a;
+  --gray-600: #5a4a8a;
+  --gray-700: #4b3e7a;
+  --gray-800: #3a2f5a;
+  --gray-900: #2e2451;
+  --teal-500: #6a4db3;
+  --teal-600: #5a3dbd;
+  --teal-50: rgba(106, 77, 179, 0.15);
 }
 
 @theme inline {
@@ -14,8 +33,27 @@
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+    --background: #bda9d7;
+    --foreground: #5a3dbd;
+    --input-background: #cbb9e3;
+    --input-text: #5a3dbd;
+    --input-border: #7e57c2;
+    --heading-text: #6a4db3;
+    --card-background: #cbb9e3;
+    --card-border: #7e57c2;
+    --gray-50: #af9ada;
+    --gray-100: #9e8ac9;
+    --gray-200: #8d7ab9;
+    --gray-300: #7c6aa9;
+    --gray-400: #6b5a9a;
+    --gray-500: #5a4a8a;
+    --gray-600: #4b3e7a;
+    --gray-700: #3a2f5a;
+    --gray-800: #2e2451;
+    --gray-900: #1f173d;
+    --teal-500: #6a4db3;
+    --teal-600: #5a3dbd;
+    --teal-50: rgba(106, 77, 179, 0.15);
   }
 }
 
@@ -23,4 +61,68 @@ body {
   background: var(--background);
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
+}
+
+/* Estilos para inputs en modo oscuro */
+input, textarea, select {
+  background-color: var(--input-background) !important;
+  color: var(--input-text) !important;
+  border-color: var(--input-border) !important;
+}
+
+/* Estilos para encabezados en modo oscuro */
+h1, h2, h3, h4, h5, h6 {
+  color: var(--heading-text) !important;
+}
+
+/* Sobrescribir clases de Tailwind para modo oscuro */
+.text-gray-900 {
+  color: var(--heading-text) !important;
+}
+
+.text-gray-800 {
+  color: var(--heading-text) !important;
+}
+
+.text-gray-700 {
+  color: var(--foreground) !important;
+}
+
+.text-gray-600 {
+  color: var(--foreground) !important;
+}
+
+.text-gray-500 {
+  color: var(--gray-500) !important;
+}
+
+.placeholder-gray-500::placeholder {
+  color: var(--input-text) !important;
+  opacity: 0.7;
+}
+
+/* Estilos para fondos en modo oscuro */
+.bg-white {
+  background-color: var(--card-background) !important;
+}
+
+.bg-gray-50 {
+  background-color: var(--gray-50) !important;
+}
+
+.bg-gray-100 {
+  background-color: var(--gray-100) !important;
+}
+
+.bg-teal-50 {
+  background-color: var(--teal-50) !important;
+}
+
+/* Estilos para bordes en modo oscuro */
+.border-gray-300 {
+  border-color: var(--input-border) !important;
+}
+
+.border-gray-200 {
+  border-color: var(--card-border) !important;
 }
