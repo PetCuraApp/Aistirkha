@@ -4,27 +4,11 @@ import { Database } from '@/types/supabase';
 import { redirect } from 'next/navigation';
 
 export async function createServerSupabaseClient() {
-  // cookies() puede ser async en Next.js 13+ (middleware/edge)
-  const cookieStore = await cookies();
-  // Forzar any para evitar errores de tipo en producción
   return createPagesServerClient<Database>(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    { cookies: cookies() },
     {
-      cookies: {
-        get(name: any) {
-          // @ts-ignore
-          return (cookieStore as any).get(name)?.value;
-        },
-        set(name: any, value: any, options: any) {
-          // @ts-ignore
-          (cookieStore as any).set({ name, value, ...options });
-        },
-        remove(name: any, options: any) {
-          // @ts-ignore
-          (cookieStore as any).set({ name, value: '', ...options });
-        },
-      },
+      supabaseUrl: process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      supabaseKey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
     }
   );
 }
