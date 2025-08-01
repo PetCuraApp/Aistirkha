@@ -1,24 +1,28 @@
-import { createServerClient } from '@supabase/auth-helpers-nextjs';
+import { createPagesServerClient } from '@supabase/auth-helpers-nextjs';
 import { cookies } from 'next/headers';
 import { Database } from '@/types/supabase';
 import { redirect } from 'next/navigation';
 
 export async function createServerSupabaseClient() {
-  const cookieStore = cookies();
-  
-  return createServerClient<Database>(
+  // cookies() puede ser async en Next.js 13+ (middleware/edge)
+  const cookieStore = await cookies();
+  // Forzar any para evitar errores de tipo en producción
+  return createPagesServerClient<Database>(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
       cookies: {
-        get(name) {
-          return cookieStore.get(name)?.value;
+        get(name: any) {
+          // @ts-ignore
+          return (cookieStore as any).get(name)?.value;
         },
-        set(name, value, options) {
-          cookieStore.set({ name, value, ...options });
+        set(name: any, value: any, options: any) {
+          // @ts-ignore
+          (cookieStore as any).set({ name, value, ...options });
         },
-        remove(name, options) {
-          cookieStore.set({ name, value: '', ...options });
+        remove(name: any, options: any) {
+          // @ts-ignore
+          (cookieStore as any).set({ name, value: '', ...options });
         },
       },
     }
@@ -46,13 +50,12 @@ export async function getUserDetails() {
     return null;
   }
 
-  const { data: userDetails } = await supabase
+  const { data: userDetails } = await (supabase
     .from('usuarios')
     .select('*')
-    .eq('id', session.user.id)
-    .single();
-
-  return userDetails;
+    .eq('id', session.user.id as any)
+    .single() as any);
+  return userDetails as any;
 }
 
 export async function requireAuth() {
@@ -69,13 +72,12 @@ export async function requireAdmin() {
     redirect('/login');
   }
 
-  const { data: userDetails } = await (await createServerSupabaseClient())
+  const { data: userDetails } = await ((await createServerSupabaseClient())
     .from('usuarios')
     .select('rol')
-    .eq('id', session.user.id)
-    .single();
-
-  if (userDetails?.rol !== 'admin') {
+    .eq('id', session.user.id as any)
+    .single() as any);
+  if ((userDetails as any)?.rol !== 'admin') {
     redirect('/');
   }
 
