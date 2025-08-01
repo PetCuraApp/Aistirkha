@@ -39,7 +39,7 @@ export async function getUserDetailsClient() {
     const { data: userDetails, error } = await supabaseClient
       .from('usuarios')
       .select('*')
-      .eq('id', session.user.id)
+      .eq('id', session.user.id as any)
       .single();
 
     if (error) {
