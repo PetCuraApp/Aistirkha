@@ -7,7 +7,6 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { createClient } from '@/utils/supabase/client';
 import { getSessionClient, getUserDetailsClient } from '@/lib/authClient';
-import type { UserDetails } from '@/lib/auth';
 import { motion } from 'framer-motion';
 import DatePicker from 'react-datepicker';
 import { format, addDays, setHours, setMinutes, isAfter, isBefore, addMinutes } from 'date-fns';
@@ -212,10 +211,11 @@ export default function ReservasPage() {
           const userDetails = await getUserDetailsClient();
           // Validar que userDetails tenga las propiedades esperadas
           if (userDetails && typeof userDetails === 'object' && 'nombre' in userDetails) {
-            setValue('nombre', userDetails.nombre || session.user.user_metadata?.full_name || '');
-            setValue('email', userDetails.email || session.user.email || '');
-            setValue('telefono', userDetails.telefono || session.user.user_metadata?.phone || '');
-            console.log('Datos del usuario cargados automáticamente:', userDetails);
+            const safeUser = userDetails as any;
+            setValue('nombre', safeUser.nombre || session.user.user_metadata?.full_name || '');
+            setValue('email', safeUser.email || session.user.email || '');
+            setValue('telefono', safeUser.telefono || session.user.user_metadata?.phone || '');
+            console.log('Datos del usuario cargados automáticamente:', safeUser);
           } else {
             setValue('nombre', session.user.user_metadata?.full_name || '');
             setValue('email', session.user.email || '');
