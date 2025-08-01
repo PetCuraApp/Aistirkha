@@ -32,7 +32,7 @@ export default function AuthForm() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
   const router = useRouter();
-  const supabase = createClient<Database>();
+  const supabase = createClient();
 
   const {
     register: registerLogin,
@@ -125,15 +125,17 @@ export default function AuthForm() {
       // 2. Insertar información adicional del usuario en la tabla 'usuarios'
       if (authData.user) {
         console.log('Insertando datos en la tabla usuarios');
-        const { error: profileError } = await supabase.from('usuarios').insert({
+        const { error: profileError } = await supabase.from('usuarios').insert([
+          {
             id: authData.user.id,
             email: data.email,
             nombre: data.nombre,
-            telefono: data.telefono,
             apellido: '',
+            telefono: data.telefono || null,
             rol: 'cliente',
             created_at: new Date().toISOString()
-          });
+          }
+        ] as any);
 
         if (profileError) {
           console.error('Error al crear perfil de usuario:', profileError.message);
