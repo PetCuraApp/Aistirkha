@@ -73,11 +73,28 @@ export default function ClientePage() {
         }
 
         console.log('Datos del usuario obtenidos:', userData);
-        setUsuario(userData as Usuario);
-        setFormData({
-          nombre: userData.nombre || '',
-          telefono: userData.telefono || '',
-        });
+
+        if (
+          userData &&
+          typeof userData === 'object' &&
+          'id' in userData &&
+          'email' in userData &&
+          'nombre' in userData &&
+          'telefono' in userData &&
+          'rol' in userData
+        ) {
+          setUsuario(userData as Usuario);
+          setFormData({
+            nombre: userData.nombre || '',
+            telefono: userData.telefono || '',
+          });
+        } else {
+          setUsuario(null);
+          setFormData({
+            nombre: '',
+            telefono: '',
+          });
+        }
 
         // Cargar reservas del usuario
         loadReservas(session.user.id);
