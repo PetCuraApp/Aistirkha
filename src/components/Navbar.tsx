@@ -31,8 +31,17 @@ export default function Navbar() {
         const userDetails = await getUserDetailsClient();
         
         if (userDetails) {
-          console.log('Rol del usuario:', userDetails.rol);
-          setIsAdmin(userDetails.rol === 'admin');
+          if (
+            typeof userDetails === 'object' &&
+            userDetails !== null &&
+            'rol' in userDetails
+          ) {
+            const safeUser = userDetails as any;
+            console.log('Rol del usuario:', safeUser.rol);
+            setIsAdmin(safeUser.rol === 'admin');
+          } else {
+            setIsAdmin(false);
+          }
         } else {
           console.log('No se pudieron obtener detalles del usuario en Navbar');
         }
@@ -55,8 +64,17 @@ export default function Navbar() {
           const userDetails = await getUserDetailsClient();
           
           if (userDetails) {
-            console.log('Rol del usuario después del cambio:', userDetails.rol);
-            setIsAdmin(userDetails.rol === 'admin');
+            if (
+              typeof userDetails === 'object' &&
+              userDetails !== null &&
+              'rol' in userDetails
+            ) {
+              const safeUser = userDetails as any;
+              console.log('Rol del usuario después del cambio:', safeUser.rol);
+              setIsAdmin(safeUser.rol === 'admin');
+            } else {
+              setIsAdmin(false);
+            }
           } else {
             console.log('No se pudieron obtener detalles del usuario después del cambio');
             setIsAdmin(false);
