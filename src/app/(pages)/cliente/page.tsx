@@ -97,10 +97,14 @@ export default function ClientePage() {
 
     try {
       console.log('Cargando reservas para el usuario:', userId);
+      // usuario_id puede ser string | null según el tipo generado
+      // usuario_id es string | null en la tabla, pero aquí siempre será string
+      // usuario_id es string | null en la tabla, pero aquí siempre será string
+      // Solo pasamos string, nunca null
       const { data, error } = await supabase
         .from('reservas')
-        .select('*, masajes(nombre, precio, duracion, descripcion_corta)') // join sin alias
-        .eq('usuario_id', userId)
+        .select('*, masajes(nombre, precio, duracion, descripcion_corta)')
+        .eq('usuario_id', userId as any)
         .order('fecha', { ascending: true });
 
       if (error) throw error;
@@ -139,8 +143,8 @@ export default function ClientePage() {
         .update({
           nombre: formData.nombre,
           telefono: formData.telefono,
-        })
-        .eq('id', usuario.id);
+        } as any)
+        .eq('id', usuario.id as any);
 
       if (error) throw error;
 
@@ -169,8 +173,8 @@ export default function ClientePage() {
       console.log('Cancelando reserva:', id);
       const { error } = await supabase
         .from('reservas')
-        .update({ estado: 'cancelada' })
-        .eq('id', id);
+        .update({ estado: 'cancelada' } as any)
+        .eq('id', id as any);
 
       if (error) throw error;
 
