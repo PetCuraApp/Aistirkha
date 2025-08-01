@@ -69,4 +69,5 @@ const validarCamposInvitado = (data: ReservaFormData, isLoggedIn: boolean) => {
 };
 
 export default function ReservasPage() {
-  // Todo el contenido original de ReservasPage ya está aquí movido correctamente.
+  // ...código de la página de reservas...
+}
