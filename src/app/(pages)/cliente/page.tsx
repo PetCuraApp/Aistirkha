@@ -83,10 +83,11 @@ export default function ClientePage() {
           'telefono' in userData &&
           'rol' in userData
         ) {
-          setUsuario(userData as Usuario);
+          const safeUser = userData as any;
+          setUsuario(safeUser as Usuario);
           setFormData({
-            nombre: userData.nombre || '',
-            telefono: userData.telefono || '',
+            nombre: safeUser.nombre || '',
+            telefono: safeUser.telefono || '',
           });
         } else {
           setUsuario(null);
