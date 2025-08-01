@@ -35,10 +35,7 @@ const horariosDisponibles = Array.from({ length: 11 }, (_, i) => {
 // Esquema de validación para el formulario
 const reservaSchema = z.object({
   tipoMasaje: z.string().min(1, { message: 'Seleccione un tipo de masaje' }),
-  fecha: z.date({
-    required_error: 'Seleccione una fecha',
-    invalid_type_error: 'Fecha inválida',
-  }),
+  fecha: z.date(),
   hora: z.string().min(1, { message: 'Seleccione una hora' }),
   nombre: z.string().optional(),
   email: z.string().optional(),
