@@ -37,7 +37,7 @@ const WORKING_HOURS = {
   end: 19
 };
 
-const TIME_SLOT_INTERVAL = 30;
+const TIME_SLOT_INTERVAL = 60;
 
 // Esquema de validación corregido y simplificado
 const baseReservaSchema = z.object({
@@ -64,7 +64,7 @@ export default function ReservasPage() {
   const [error, setError] = useState<string | null>(null);
   const [user, setUser] = useState<any>(null);
   const [userDetails, setUserDetails] = useState<UserDetails | null>(null);
-  const [availableTimes, setAvailableTimes] = useState<string[]>([]);
+  const [timeSlots, setTimeSlots] = useState<{ time: string; available: boolean }[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const {
@@ -149,10 +149,31 @@ export default function ReservasPage() {
     loadData();
   }, [supabase, setValue]);
 
+  // Generar franjas horarias con disponibilidad
+  const generateTimeSlots = (reservedTimes: Set<string>) => {
+    const slots: { time: string; available: boolean }[] = [];
+    const startHour = WORKING_HOURS.start;
+    const endHour = WORKING_HOURS.end;
+    
+    for (let hour = startHour; hour < endHour; hour++) {
+      for (let minute = 0; minute < 60; minute += TIME_SLOT_INTERVAL) {
+        const time = `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`;
+        slots.push({
+          time: time,
+          available: !reservedTimes.has(time)
+        });
+      }
+    }
+    return slots;
+  };
+
   // Obtener horarios disponibles
   useEffect(() => {
     const fetchAvailableTimes = async () => {
-      if (!selectedDate) return;
+      if (!selectedDate) {
+        setTimeSlots([]);
+        return;
+      }
       
       try {
         const formattedDate = format(selectedDate, 'yyyy-MM-dd');
@@ -161,37 +182,24 @@ export default function ReservasPage() {
           .select('hora')
           .eq('fecha', formattedDate);
         
-        if (error) throw error;
+        if (error) {
+          console.error('Error fetching reservations:', error);
+          throw error;
+        }
 
-        const allSlots = generateTimeSlots();
-        const reservedTimes = existingReservas?.map(r => r.hora) || [];
-        const available = allSlots.filter(slot => !reservedTimes.includes(slot));
+        const reservedTimes = new Set(existingReservas?.map(r => r.hora.substring(0, 5)) || []);
+        const slotsWithAvailability = generateTimeSlots(reservedTimes);
         
-        setAvailableTimes(available);
+        setTimeSlots(slotsWithAvailability);
       } catch (err) {
         console.error('Error fetching available times:', err);
-        setAvailableTimes([]);
+        setTimeSlots([]); // Clear slots on error
       }
     };
 
-    if (selectedDate) {
-      fetchAvailableTimes();
-    }
+    fetchAvailableTimes();
   }, [selectedDate, supabase]);
 
-  // Generar franjas horarias
-  const generateTimeSlots = () => {
-    const slots: string[] = [];
-    const startHour = WORKING_HOURS.start;
-    const endHour = WORKING_HOURS.end;
-    
-    for (let hour = startHour; hour < endHour; hour++) {
-      for (let minute = 0; minute < 60; minute += TIME_SLOT_INTERVAL) {
-        slots.push(`${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`);
-      }
-    }
-    return slots;
-  };
 
   // Validar paso 3 según si el usuario está logueado o no
   const validateStep3 = async () => {
@@ -238,9 +246,37 @@ export default function ReservasPage() {
       const masajeSeleccionado = masajes.find(m => m.id === data.tipoMasaje);
       if (!masajeSeleccionado) throw new Error('No se encontró el masaje seleccionado');
 
+      const formattedDate = format(data.fecha, 'yyyy-MM-dd');
+
+      // Double-check if the time slot is still available
+      const { data: existingReservations, error: checkError } = await supabase
+        .from('reservas')
+        .select('id')
+        .eq('fecha', formattedDate)
+        .eq('hora', data.hora)
+        .limit(1);
+
+      if (checkError) {
+        console.error('Error checking for existing reservations:', checkError);
+        throw new Error('Error al verificar la disponibilidad. Intente de nuevo.');
+      }
+
+      if (existingReservations && existingReservations.length > 0) {
+        setError('Lo sentimos, esta hora ya no está disponible. Por favor, elija otro horario.');
+        
+        // Manually update the specific slot to be unavailable in the UI
+        setTimeSlots(prevSlots => prevSlots.map(slot => 
+          slot.time === data.hora ? { ...slot, available: false } : slot
+        ));
+        
+        setStep(2); // Go back to the time selection step
+        setIsSubmitting(false);
+        return; // Stop the submission
+      }
+
       const reservaData = {
         masaje_id: data.tipoMasaje,
-        fecha: format(data.fecha, 'yyyy-MM-dd'),
+        fecha: formattedDate,
         hora: data.hora,
         duracion: masajeSeleccionado.duracion,
         precio: masajeSeleccionado.precio,
@@ -409,16 +445,33 @@ export default function ReservasPage() {
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">Hora</label>
-                      <select
-                        {...register('hora')}
-                        disabled={!selectedDate}
-                        className="w-full p-2 border rounded-md disabled:bg-gray-100 focus:ring-blue-500 focus:border-blue-500"
-                      >
-                        <option value="">{selectedDate ? 'Selecciona una hora' : 'Primero selecciona una fecha'}</option>
-                        {availableTimes.map((time) => (
-                          <option key={time} value={time}>{time}</option>
-                        ))}
-                      </select>
+                      <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
+                        {timeSlots.length > 0 ? (
+                          timeSlots.map((slot) => (
+                            <button
+                              key={slot.time}
+                              type="button"
+                              disabled={!slot.available}
+                              onClick={() => {
+                                setValue('hora', slot.time, { shouldValidate: true });
+                                trigger('hora');
+                              }}
+                              className={`w-full p-2 rounded-md text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:bg-gray-200 disabled:text-gray-500 
+                                ${!slot.available ? 'line-through' : ''}
+                                ${watch('hora') === slot.time
+                                  ? 'bg-blue-600 text-white'
+                                  : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-100'
+                                }`}
+                            >
+                              {slot.time}
+                            </button>
+                          ))
+                        ) : (
+                          <p className="text-sm text-gray-500 col-span-full">
+                            {selectedDate ? 'No hay horas disponibles para este día.' : 'Selecciona una fecha para ver las horas.'}
+                          </p>
+                        )}
+                      </div>
                       {errors.hora && <p className="text-red-500 text-sm mt-1">{errors.hora.message}</p>}
                     </div>
                   </div>
