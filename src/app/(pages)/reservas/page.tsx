@@ -1,21 +1,20 @@
 'use client';
 
-import React, { useState, useEffect, createContext, useContext } from 'react';
-import { useSearchParams } from 'next/navigation';
+import React, { useState, useEffect } from 'react';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { createClient } from '@/utils/supabase/client';
-import { getSessionClient, getUserDetailsClient } from '@/lib/authClient';
-import { motion } from 'framer-motion';
+import { getSessionClient } from '@/lib/authClient';
+import { motion, AnimatePresence } from 'framer-motion';
 import DatePicker from 'react-datepicker';
-import { format, addDays, setHours, setMinutes, isAfter, isBefore, addMinutes } from 'date-fns';
+import { format, addDays, isAfter } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { FiCalendar, FiClock, FiUser, FiMail, FiPhone, FiCreditCard, FiCheckCircle } from 'react-icons/fi';
+import { FiCheckCircle, FiArrowLeft, FiArrowRight, FiCreditCard } from 'react-icons/fi';
 import 'react-datepicker/dist/react-datepicker.css';
 
 type Masaje = {
-  id: string;
+  id: number;
   nombre: string;
   descripcion_corta: string;
   duracion: number;
@@ -23,327 +22,631 @@ type Masaje = {
   imagen_url: string;
 };
 
-// Horarios disponibles (9:00 AM a 7:00 PM)
-const horariosDisponibles = Array.from({ length: 11 }, (_, i) => {
-  const hour = i + 9;
-  return {
-    value: `${hour}:00`,
-    label: `${hour}:00 ${hour < 12 ? 'AM' : 'PM'}`.replace('12:00 PM', '12:00 PM'),
-  };
-});
-
-// Esquema de validación para el formulario
-const reservaSchema = z.object({
-  tipoMasaje: z.string().min(1, { message: 'Seleccione un tipo de masaje' }),
-  fecha: z.date(),
-  hora: z.string().min(1, { message: 'Seleccione una hora' }),
-  nombre: z.string().optional(),
-  email: z.string().optional(),
-  telefono: z.string().optional(),
-  comentarios: z.string().optional(),
-  metodoPago: z.enum(['tarjeta', 'efectivo'], { message: 'Seleccione un método de pago' }),
-});
-
-// Creamos un contexto para saber si el usuario está logueado
-const UserContext = createContext<{ isLoggedIn: boolean }>({ isLoggedIn: false });
-
-type ReservaFormData = z.infer<typeof reservaSchema>;
-
-// Esquema de validación condicional que se aplicará solo si el usuario no está logueado
-const validarCamposInvitado = (data: ReservaFormData, isLoggedIn: boolean) => {
-  // Si el usuario está logueado, no necesitamos validar estos campos
-  if (isLoggedIn) return true;
-  
-  // Si no está logueado, validamos que haya completado los campos
-  if (!data.nombre) {
-    return { path: 'nombre', message: 'El nombre es requerido si no estás logueado.' };
-  }
-  if (!data.email) {
-    return { path: 'email', message: 'El email es requerido si no estás logueado.' };
-  }
-  if (!data.telefono) {
-    return { path: 'telefono', message: 'El teléfono es requerido si no estás logueado.' };
-  }
-  
-  return true;
+type UserDetails = {
+  id: string;
+  email: string;
+  nombre: string;
+  telefono: string;
+  rol: string;
 };
+
+const WORKING_HOURS = {
+  start: 9,
+  end: 19
+};
+
+const TIME_SLOT_INTERVAL = 30;
+
+const baseReservaSchema = z.object({
+  tipoMasaje: z.number({
+    required_error: 'Seleccione un tipo de masaje',
+    invalid_type_error: 'ID de masaje inválido'
+  }),
+  fecha: z.date({
+    required_error: 'Seleccione una fecha',
+    invalid_type_error: 'Fecha inválida'
+  }).refine(date => isAfter(date, new Date()), {
+    message: 'La fecha debe ser futura'
+  }),
+  hora: z.string().min(1, { message: 'Seleccione una hora' }),
+  nombre: z.string().min(2, { message: 'Mínimo 2 caracteres' }),
+  email: z.string().email({ message: 'Email inválido' }),
+  telefono: z.string().min(8, { message: 'Mínimo 8 caracteres' }),
+  comentarios: z.string().max(500, { message: 'Máximo 500 caracteres' }).optional(),
+  metodoPago: z.enum(['transferencia', 'efectivo'], {
+    required_error: 'Seleccione un método de pago'
+  }),
+});
+
+type ReservaFormData = z.infer<typeof baseReservaSchema>;
 
 export default function ReservasPage() {
   const supabase = createClient();
   const [masajes, setMasajes] = useState<Masaje[]>([]);
   const [step, setStep] = useState(1);
-  const [selectedDate, setSelectedDate] = useState<Date | null>(null);
-  const [selectedTime, setSelectedTime] = useState<string>('');
-  const [availableTimes, setAvailableTimes] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [user, setUser] = useState<any>(null);
-  const [userDetails, setUserDetails] = useState<any>(null);
+  const [userDetails, setUserDetails] = useState<UserDetails | null>(null);
+  const [availableTimes, setAvailableTimes] = useState<string[]>([]);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Formulario
   const {
     register,
     handleSubmit,
     control,
     setValue,
-    formState: { errors },
-    getValues,
+    watch,
     trigger,
-    reset
+    reset,
+    formState: { errors, isValid }
   } = useForm<ReservaFormData>({
-    resolver: zodResolver(reservaSchema),
+    resolver: zodResolver(baseReservaSchema),
+    mode: 'onChange',
     defaultValues: {
-      tipoMasaje: '',
+      tipoMasaje: undefined as any,
       fecha: undefined,
       hora: '',
       nombre: '',
       email: '',
       telefono: '',
       comentarios: '',
-      metodoPago: undefined as any,
+      metodoPago: 'efectivo', // Establecer efectivo como predeterminado
     },
   });
 
-  // Cargar masajes y usuario
+  const selectedDate = watch('fecha');
+  const tipoMasaje = watch('tipoMasaje');
+  const metodoPago = watch('metodoPago');
+
   useEffect(() => {
-    const fetchMasajes = async () => {
-      const { data, error } = await supabase.from('masajes').select('*');
-      if (!error) setMasajes(data as Masaje[]);
-    };
-    fetchMasajes();
-    const getUser = async () => {
-      const session = await getSessionClient();
-      setUser(session?.user ?? null);
-      if (session?.user) {
-        const details = await getUserDetailsClient();
-        setUserDetails(details);
-        setValue('nombre', details?.full_name || '');
-        setValue('email', details?.email || '');
-        setValue('telefono', details?.telefono || '');
+    const loadData = async () => {
+      try {
+        // Cargar los tipos de masaje
+        const { data: masajesData, error: masajesError } = await supabase
+          .from('masajes')
+          .select('*')
+          .order('nombre', { ascending: true });
+        
+        if (!masajesError && masajesData) {
+          setMasajes(masajesData.map(m => ({
+            ...m,
+            id: Number(m.id)
+          })));
+        }
+
+        // Verificar sesión del usuario
+        const session = await getSessionClient();
+        setUser(session?.user ?? null);
+        
+        if (session?.user) {
+          // Obtener detalles del usuario desde la tabla usuarios
+          const { data: userData, error: userError } = await supabase
+            .from('usuarios')
+            .select('*')
+            .eq('email', session.user.email)
+            .single();
+          
+          if (!userError && userData) {
+            setUserDetails({
+              id: userData.id,
+              email: userData.email,
+              nombre: userData.nombre,
+              telefono: userData.telefono,
+              rol: userData.rol
+            });
+            
+            // Establecer valores del formulario
+            setValue('nombre', userData.nombre || '');
+            setValue('email', session.user.email || '');
+            setValue('telefono', userData.telefono || '');
+          }
+        }
+      } catch (err) {
+        console.error('Error loading data:', err);
+      } finally {
+        setLoading(false);
       }
     };
-    getUser();
+
+    loadData();
   }, [supabase, setValue]);
 
-  // Actualizar horarios disponibles según la fecha
   useEffect(() => {
-    if (!selectedDate) return;
-    const fetchReservas = async () => {
-      const { data, error } = await supabase
-        .from('reservas')
-        .select('hora')
-        .eq('fecha', format(selectedDate, 'yyyy-MM-dd'));
-      const reservadas = (data || []).map((r: any) => r.hora);
-      // Horarios cada 5 minutos de 9:00 a 19:00
-      const times: string[] = [];
-      for (let h = 9; h < 19; h++) {
-        for (let m = 0; m < 60; m += 5) {
-          const t = `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`;
-          if (!reservadas.includes(t)) times.push(t);
-        }
+    const fetchAvailableTimes = async () => {
+      if (!selectedDate) return;
+      
+      try {
+        const formattedDate = format(selectedDate, 'yyyy-MM-dd');
+        const { data: existingReservas, error } = await supabase
+          .from('reservas')
+          .select('hora')
+          .eq('fecha', formattedDate);
+        
+        if (error) throw error;
+
+        const allSlots = generateTimeSlots();
+        const reservedTimes = existingReservas?.map(r => r.hora) || [];
+        const available = allSlots.filter(slot => !reservedTimes.includes(slot));
+        
+        setAvailableTimes(available);
+      } catch (err) {
+        console.error('Error fetching available times:', err);
+        setAvailableTimes([]);
       }
-      setAvailableTimes(times);
     };
-    fetchReservas();
+
+    if (selectedDate) {
+      fetchAvailableTimes();
+    }
   }, [selectedDate, supabase]);
 
-  // Validación condicional para invitados
-  const validateGuestFields = (data: ReservaFormData) => {
-    if (user) return true;
-    if (!data.nombre) return { path: 'nombre', message: 'El nombre es requerido.' };
-    if (!data.email) return { path: 'email', message: 'El email es requerido.' };
-    if (!data.telefono) return { path: 'telefono', message: 'El teléfono es requerido.' };
-    return true;
+  const generateTimeSlots = () => {
+    const slots: string[] = [];
+    const startHour = WORKING_HOURS.start;
+    const endHour = WORKING_HOURS.end;
+    
+    for (let hour = startHour; hour < endHour; hour++) {
+      for (let minute = 0; minute < 60; minute += TIME_SLOT_INTERVAL) {
+        slots.push(`${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`);
+      }
+    }
+    return slots;
   };
 
-  // Enviar reserva
-  const onSubmit = async (data: ReservaFormData) => {
-    setLoading(true);
-    setError(null);
-    // Validación extra para invitados
-    const guestValidation = validateGuestFields(data);
-    if (guestValidation !== true) {
-      setError((guestValidation as any).message);
-      setLoading(false);
-      return;
+  const validateStep3 = async () => {
+    if (user) {
+      // Para usuarios logueados solo validamos el método de pago
+      return await trigger('metodoPago');
+    } else {
+      // Para invitados validamos todos los campos
+      return await trigger(['nombre', 'email', 'telefono', 'metodoPago']);
     }
+  };
+
+  const nextStep = async () => {
+    let isValid = false;
+    
+    switch (step) {
+      case 1:
+        isValid = await trigger('tipoMasaje');
+        break;
+      case 2:
+        isValid = await trigger(['fecha', 'hora']);
+        break;
+      case 3:
+        isValid = await validateStep3();
+        break;
+      default:
+        isValid = false;
+    }
+
+    if (isValid) {
+      setStep(prev => prev + 1);
+    } else {
+      // Mostrar errores específicos
+      if (step === 3 && !metodoPago) {
+        setError('Por favor seleccione un método de pago');
+      }
+    }
+  };
+
+  const onSubmit = async (data: ReservaFormData) => {
+    setIsSubmitting(true);
+    setError(null);
+    
     try {
-      const insertData: any = {
+      const masajeSeleccionado = masajes.find(m => m.id === data.tipoMasaje);
+      if (!masajeSeleccionado) throw new Error('No se encontró el masaje seleccionado');
+
+      const reservaData = {
         masaje_id: data.tipoMasaje,
         fecha: format(data.fecha, 'yyyy-MM-dd'),
         hora: data.hora,
+        duracion: masajeSeleccionado.duracion,
+        precio: masajeSeleccionado.precio,
         estado: 'pendiente',
-        created_at: new Date().toISOString(),
         metodo_pago: data.metodoPago,
-        comentarios: data.comentarios,
+        comentarios: data.comentarios || null,
+        usuario_id: user?.id || null,
+        nombre_invitado: !user ? data.nombre : null,
+        email_invitado: !user ? data.email : null,
+        telefono_invitado: !user ? data.telefono : null,
+        created_at: new Date().toISOString()
       };
-      if (user) {
-        insertData.usuario_id = user.id;
-      } else {
-        insertData.email_invitado = data.email;
-        insertData.nombre_invitado = data.nombre;
-        insertData.telefono_invitado = data.telefono;
-      }
-      const { error: insertError } = await supabase.from('reservas').insert([insertData]);
+
+      const { error: insertError } = await supabase
+        .from('reservas')
+        .insert(reservaData)
+        .select();
+      
       if (insertError) throw insertError;
+
       setSuccess(true);
       reset();
-      setStep(1);
-    } catch (e: any) {
-      setError('Error al reservar. Intenta nuevamente.');
+    } catch (err: any) {
+      console.error('Error creating reservation:', err);
+      setError(err.message || 'Error al realizar la reserva. Intente nuevamente.');
     } finally {
-      setLoading(false);
+      setIsSubmitting(false);
     }
   };
 
-  // Renderizado de pasos
+  const prevStep = () => setStep(prev => prev - 1);
+  const resetForm = () => {
+    setSuccess(false);
+    setStep(1);
+    reset();
+  };
+
   return (
-    <div className="max-w-2xl mx-auto bg-white rounded-lg shadow p-6 mt-8">
-      <h1 className="text-2xl font-bold mb-6 text-center">Reserva tu hora</h1>
-      {success && (
-        <div className="flex flex-col items-center text-green-600 mb-4">
-          <FiCheckCircle size={48} />
-          <p className="mt-2">¡Reserva realizada con éxito!</p>
+    <div className="max-w-4xl mx-auto bg-white rounded-lg shadow-lg overflow-hidden my-8">
+      <div className="p-6 md:p-8">
+        <h1 className="text-3xl font-bold text-center text-gray-800 mb-8">Reserva tu sesión de masaje</h1>
+        
+        <div className="flex justify-between mb-8">
+          {[1, 2, 3, 4].map((stepNumber) => (
+            <div key={stepNumber} className="flex flex-col items-center">
+              <div className={`w-10 h-10 rounded-full flex items-center justify-center 
+                ${step === stepNumber ? 'bg-blue-600 text-white' : 
+                  step > stepNumber ? 'bg-green-500 text-white' : 'bg-gray-200 text-gray-700'}`}>
+                {stepNumber}
+              </div>
+              <span className="text-sm mt-2 text-gray-600">
+                {stepNumber === 1 ? 'Servicio' : stepNumber === 2 ? 'Fecha/Hora' : stepNumber === 3 ? 'Datos' : 'Confirmar'}
+              </span>
+            </div>
+          ))}
         </div>
-      )}
-      {error && <div className="text-red-500 mb-4">{error}</div>}
-      {!success && (
-        <form onSubmit={handleSubmit(onSubmit)}>
-          {/* Paso 1: Selección de masaje */}
-          {step === 1 && (
-            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
-              <label className="block mb-2 font-semibold">Tipo de masaje</label>
-              <select {...register('tipoMasaje')} className="w-full border rounded p-2 mb-4">
-                <option value="">Selecciona un masaje</option>
-                {masajes.map((m) => (
-                  <option key={m.id} value={m.id}>{m.nombre} - ${m.precio}</option>
-                ))}
-              </select>
-              {errors.tipoMasaje && <span className="text-red-500 text-sm">{errors.tipoMasaje.message as string}</span>}
-              <button type="button" className="mt-4 bg-blue-500 text-white px-4 py-2 rounded" onClick={async () => {
-                const valid = await trigger('tipoMasaje');
-                if (valid) setStep(2);
-              }}>Siguiente</button>
-            </motion.div>
-          )}
 
-          {/* Paso 2: Selección de fecha y hora */}
-          {step === 2 && (
-            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
-              <label className="block mb-2 font-semibold">Selecciona la fecha y hora</label>
-              <div className="flex gap-4 mb-4">
-                <Controller
-                  control={control}
-                  name="fecha"
-                  render={({ field }) =>
-                    React.createElement(DatePicker as any, {
-                      ...field,
-                      selected: selectedDate,
-                      onChange: (date: Date | null) => {
-                        setSelectedDate(date);
-                        setValue('fecha', date as Date);
-                        setValue('hora', '');
-                        setSelectedTime('');
-                      },
-                      minDate: new Date(),
-                      dateFormat: 'yyyy-MM-dd',
-                      locale: es,
-                      className: 'border rounded p-2',
-                      placeholderText: 'Selecciona fecha',
-                    })
-                  }
-                />
-                <div>
-                  <label className="block text-sm mb-1">Hora</label>
-                  <select
-                    className="border rounded p-2"
-                    value={selectedTime}
-                    onChange={e => {
-                      setSelectedTime(e.target.value);
-                      setValue('hora', e.target.value);
-                    }}
-                    disabled={!selectedDate}
-                  >
-                    <option value="">Selecciona hora</option>
-                    {availableTimes.map((t) => (
-                      <option key={t} value={t}>{t}</option>
+        {error && (
+          <div className="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 mb-6 rounded">
+            <p>{error}</p>
+          </div>
+        )}
+
+        {success ? (
+          <div className="text-center py-12">
+            <div className="inline-flex items-center justify-center w-20 h-20 bg-green-100 rounded-full mb-6">
+              <FiCheckCircle className="text-green-600 text-4xl" />
+            </div>
+            <h2 className="text-2xl font-bold text-gray-800 mb-4">¡Reserva confirmada!</h2>
+            <p className="text-gray-600 mb-8">Hemos recibido correctamenta tu reserva. En breve nos contactaremos contigo.</p>
+            <button
+              onClick={resetForm}
+              className="bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-6 rounded-lg transition duration-200"
+            >
+              Hacer otra reserva
+            </button>
+          </div>
+        ) : (
+          <form onSubmit={handleSubmit(onSubmit)}>
+            <AnimatePresence mode="wait">
+              {/* Paso 1: Selección de masaje */}
+              {step === 1 && (
+                <motion.div
+                  key="step1"
+                  initial={{ opacity: 0, x: 50 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: -50 }}
+                  transition={{ duration: 0.3 }}
+                  className="space-y-6"
+                >
+                  <h2 className="text-xl font-semibold text-gray-800">Selecciona tu masaje</h2>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {masajes.map((masaje) => (
+                      <div 
+                        key={masaje.id}
+                        className={`border rounded-lg p-4 cursor-pointer transition-all
+                          ${tipoMasaje === masaje.id ? 'border-blue-500 bg-blue-50' : 'border-gray-200 hover:border-blue-300'}`}
+                        onClick={() => {
+                          setValue('tipoMasaje', masaje.id);
+                          trigger('tipoMasaje');
+                        }}
+                      >
+                        <h3 className="font-medium text-gray-800">{masaje.nombre}</h3>
+                        <p className="text-sm text-gray-600 mt-1">{masaje.descripcion_corta}</p>
+                        <div className="flex justify-between items-center mt-3">
+                          <span className="text-blue-600 font-medium">${masaje.precio}</span>
+                          <span className="text-sm text-gray-500">{masaje.duracion} min</span>
+                        </div>
+                      </div>
                     ))}
-                  </select>
-                </div>
-              </div>
-              {(errors.fecha || errors.hora) && <span className="text-red-500 text-sm">{(errors.fecha?.message || errors.hora?.message) as string}</span>}
-              <div className="flex justify-between mt-4">
-                <button type="button" className="bg-gray-300 px-4 py-2 rounded" onClick={() => setStep(1)}>Atrás</button>
-                <button type="button" className="bg-blue-500 text-white px-4 py-2 rounded" onClick={async () => {
-                  const valid = await trigger(['fecha', 'hora']);
-                  if (valid && selectedTime) setStep(3);
-                }}>Siguiente</button>
-              </div>
-            </motion.div>
-          )}
-
-          {/* Paso 3: Datos personales y pago */}
-          {step === 3 && (
-            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
-              {!user && (
-                <>
-                  <label className="block mb-2 font-semibold">Nombre</label>
-                  <input {...register('nombre')} className="w-full border rounded p-2 mb-2" />
-                  {errors.nombre && <span className="text-red-500 text-sm">{errors.nombre.message as string}</span>}
-                  <label className="block mb-2 font-semibold">Email</label>
-                  <input {...register('email')} className="w-full border rounded p-2 mb-2" />
-                  {errors.email && <span className="text-red-500 text-sm">{errors.email.message as string}</span>}
-                  <label className="block mb-2 font-semibold">Teléfono</label>
-                  <input {...register('telefono')} className="w-full border rounded p-2 mb-2" />
-                  {errors.telefono && <span className="text-red-500 text-sm">{errors.telefono.message as string}</span>}
-                </>
+                  </div>
+                  {errors.tipoMasaje && <p className="text-red-500 text-sm">{errors.tipoMasaje.message}</p>}
+                  <div className="flex justify-end pt-4">
+                    <button
+                      type="button"
+                      onClick={nextStep}
+                      disabled={!tipoMasaje}
+                      className="bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-6 rounded-lg disabled:bg-gray-400 transition duration-200 flex items-center"
+                    >
+                      Siguiente <FiArrowRight className="ml-2" />
+                    </button>
+                  </div>
+                </motion.div>
               )}
-              <label className="block mb-2 font-semibold">Comentarios (opcional)</label>
-              <textarea {...register('comentarios')} className="w-full border rounded p-2 mb-2" />
-              <label className="block mb-2 font-semibold">Método de pago</label>
-              <select {...register('metodoPago')} className="w-full border rounded p-2 mb-2">
-                <option value="">Selecciona método de pago</option>
-                <option value="tarjeta">Tarjeta</option>
-                <option value="efectivo">Efectivo</option>
-              </select>
-              {errors.metodoPago && <span className="text-red-500 text-sm">{errors.metodoPago.message as string}</span>}
-              <div className="flex justify-between mt-4">
-                <button type="button" className="bg-gray-300 px-4 py-2 rounded" onClick={() => setStep(2)}>Atrás</button>
-                <button type="button" className="bg-blue-500 text-white px-4 py-2 rounded" onClick={async () => {
-                  const valid = await trigger();
-                  if (valid) setStep(4);
-                }}>Siguiente</button>
-              </div>
-            </motion.div>
-          )}
 
-          {/* Paso 4: Resumen y confirmación */}
-          {step === 4 && (
-            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
-              <h2 className="text-xl font-semibold mb-4">Resumen de la reserva</h2>
-              <ul className="mb-4">
-                <li><b>Masaje:</b> {masajes.find(m => m.id == getValues('tipoMasaje'))?.nombre}</li>
-                <li><b>Fecha:</b> {getValues('fecha') ? format(getValues('fecha') as Date, 'yyyy-MM-dd') : ''}</li>
-                <li><b>Hora:</b> {getValues('hora')}</li>
-                {!user && <>
-                  <li><b>Nombre:</b> {getValues('nombre')}</li>
-                  <li><b>Email:</b> {getValues('email')}</li>
-                  <li><b>Teléfono:</b> {getValues('telefono')}</li>
-                </>}
-                <li><b>Método de pago:</b> {getValues('metodoPago')}</li>
-                {getValues('comentarios') && <li><b>Comentarios:</b> {getValues('comentarios')}</li>}
-              </ul>
-              <div className="flex justify-between">
-                <button type="button" className="bg-gray-300 px-4 py-2 rounded" onClick={() => setStep(3)}>Atrás</button>
-                <button type="submit" className="bg-green-600 text-white px-4 py-2 rounded flex items-center" disabled={loading}>
-                  {loading ? 'Reservando...' : 'Confirmar reserva'}
-                </button>
-              </div>
-            </motion.div>
-          )}
-        </form>
-      )}
+              {/* Paso 2: Fecha y hora */}
+              {step === 2 && (
+                <motion.div
+                  key="step2"
+                  initial={{ opacity: 0, x: 50 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: -50 }}
+                  transition={{ duration: 0.3 }}
+                  className="space-y-6"
+                >
+                  <h2 className="text-xl font-semibold text-gray-800">Selecciona fecha y hora</h2>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Fecha</label>
+                      <Controller
+                        control={control}
+                        name="fecha"
+                        render={({ field }) => (
+                          <DatePicker
+                            selected={field.value}
+                            onChange={(date) => {
+                              field.onChange(date);
+                              setValue('hora', '');
+                            }}
+                            minDate={new Date()}
+                            maxDate={addDays(new Date(), 30)}
+                            dateFormat="dd/MM/yyyy"
+                            locale={es}
+                            placeholderText="Selecciona una fecha"
+                            className="w-full p-2 border rounded-md focus:ring-blue-500 focus:border-blue-500"
+                          />
+                        )}
+                      />
+                      {errors.fecha && <p className="text-red-500 text-sm mt-1">{errors.fecha.message}</p>}
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Hora</label>
+                      <select
+                        {...register('hora')}
+                        disabled={!selectedDate}
+                        className="w-full p-2 border rounded-md disabled:bg-gray-100 focus:ring-blue-500 focus:border-blue-500"
+                      >
+                        <option value="">{selectedDate ? 'Selecciona una hora' : 'Primero selecciona una fecha'}</option>
+                        {availableTimes.map((time) => (
+                          <option key={time} value={time}>{time}</option>
+                        ))}
+                      </select>
+                      {errors.hora && <p className="text-red-500 text-sm mt-1">{errors.hora.message}</p>}
+                    </div>
+                  </div>
+                  <div className="flex justify-between pt-4">
+                    <button
+                      type="button"
+                      onClick={prevStep}
+                      className="text-gray-600 hover:text-gray-800 font-medium py-2 px-6 rounded-lg border border-gray-300 hover:border-gray-400 transition duration-200 flex items-center"
+                    >
+                      <FiArrowLeft className="mr-2" /> Atrás
+                    </button>
+                    <button
+                      type="button"
+                      onClick={nextStep}
+                      disabled={!selectedDate || !watch('hora')}
+                      className="bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-6 rounded-lg disabled:bg-gray-400 transition duration-200 flex items-center"
+                    >
+                      Siguiente <FiArrowRight className="ml-2" />
+                    </button>
+                  </div>
+                </motion.div>
+              )}
+
+              {/* Paso 3: Datos personales */}
+              {step === 3 && (
+                <motion.div
+                  key="step3"
+                  initial={{ opacity: 0, x: 50 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: -50 }}
+                  transition={{ duration: 0.3 }}
+                  className="space-y-6"
+                >
+                  <h2 className="text-xl font-semibold text-gray-800">Tus datos</h2>
+                  
+                  {!user ? (
+                    <div className="space-y-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Nombre completo</label>
+                        <input
+                          {...register('nombre')}
+                          className="w-full p-2 border rounded-md focus:ring-blue-500 focus:border-blue-500"
+                          placeholder="Tu nombre"
+                        />
+                        {errors.nombre && <p className="text-red-500 text-sm mt-1">{errors.nombre.message}</p>}
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Correo electrónico</label>
+                        <input
+                          {...register('email')}
+                          type="email"
+                          className="w-full p-2 border rounded-md focus:ring-blue-500 focus:border-blue-500"
+                          placeholder="tu@email.com"
+                        />
+                        {errors.email && <p className="text-red-500 text-sm mt-1">{errors.email.message}</p>}
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Teléfono</label>
+                        <input
+                          {...register('telefono')}
+                          className="w-full p-2 border rounded-md focus:ring-blue-500 focus:border-blue-500"
+                          placeholder="+56 9 1234 5678"
+                        />
+                        {errors.telefono && <p className="text-red-500 text-sm mt-1">{errors.telefono.message}</p>}
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Nombre</label>
+                        <input
+                          {...register('nombre')}
+                          className="w-full p-2 bg-gray-100 rounded-md"
+                          readOnly
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Correo electrónico</label>
+                        <input
+                          {...register('email')}
+                          className="w-full p-2 bg-gray-100 rounded-md"
+                          readOnly
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Teléfono</label>
+                        <input
+                          {...register('telefono')}
+                          className="w-full p-2 bg-gray-100 rounded-md"
+                          readOnly
+                        />
+                      </div>
+                    </div>
+                  )}
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Método de pago</label>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-2">
+                      <label className={`border rounded-lg p-4 cursor-not-allowed bg-gray-100 transition-all
+                        ${watch('metodoPago') === 'tarjeta' ? 'border-blue-500 bg-blue-50' : 'border-gray-200'}`}>
+                        <input type="radio" disabled className="hidden" />
+                        <div className="flex items-center">
+                          <FiCreditCard className="text-gray-500 mr-3" />
+                          <span className="text-gray-500">Tarjeta (Próximamente)</span>
+                        </div>
+                      </label>
+                      <label className={`border rounded-lg p-4 cursor-pointer transition-all
+                        ${watch('metodoPago') === 'efectivo' ? 'border-blue-500 bg-blue-50' : 'border-gray-200 hover:border-blue-300'}`}>
+                        <input
+                          type="radio"
+                          {...register('metodoPago')}
+                          value="efectivo"
+                          className="hidden"
+                        />
+                        <div className="flex items-center">
+                          <span className="mr-3">💵</span>
+                          <span>Efectivo</span>
+                        </div>
+                      </label>
+                    </div>
+                    {errors.metodoPago && <p className="text-red-500 text-sm mt-1">{errors.metodoPago.message}</p>}
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Comentarios adicionales (opcional)</label>
+                    <textarea
+                      {...register('comentarios')}
+                      rows={3}
+                      className="w-full p-2 border rounded-md focus:ring-blue-500 focus:border-blue-500"
+                      placeholder="Alergias, lesiones, preferencias especiales..."
+                    />
+                  </div>
+                  
+                  <div className="flex justify-between pt-4">
+                    <button
+                      type="button"
+                      onClick={prevStep}
+                      className="text-gray-600 hover:text-gray-800 font-medium py-2 px-6 rounded-lg border border-gray-300 hover:border-gray-400 transition duration-200 flex items-center"
+                    >
+                      <FiArrowLeft className="mr-2" /> Atrás
+                    </button>
+                    <button
+                      type="button"
+                      onClick={nextStep}
+                      className="bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-6 rounded-lg disabled:bg-gray-400 transition duration-200 flex items-center"
+                    >
+                      Revisar reserva <FiArrowRight className="ml-2" />
+                    </button>
+                  </div>
+                </motion.div>
+              )}
+
+              {/* Paso 4: Confirmación */}
+              {step === 4 && (
+                <motion.div
+                  key="step4"
+                  initial={{ opacity: 0, x: 50 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: -50 }}
+                  transition={{ duration: 0.3 }}
+                  className="space-y-6"
+                >
+                  <h2 className="text-xl font-semibold text-gray-800">Confirma tu reserva</h2>
+                  <div className="bg-gray-50 rounded-lg p-6 space-y-4">
+                    <h3 className="font-medium text-lg text-gray-800 border-b pb-2">Detalles de la reserva</h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <p className="text-sm text-gray-500">Servicio:</p>
+                        <p className="font-medium">{masajes.find(m => m.id === watch('tipoMasaje'))?.nombre || 'No seleccionado'}</p>
+                      </div>
+                      <div className="space-y-2">
+                        <p className="text-sm text-gray-500">Duración:</p>
+                        <p className="font-medium">{masajes.find(m => m.id === watch('tipoMasaje'))?.duracion || '--'} minutos</p>
+                      </div>
+                      <div className="space-y-2">
+                        <p className="text-sm text-gray-500">Fecha:</p>
+                        <p className="font-medium">
+                          {watch('fecha') ? format(watch('fecha'), 'EEEE dd/MM/yyyy', { locale: es }) : 'No seleccionada'}
+                        </p>
+                      </div>
+                      <div className="space-y-2">
+                        <p className="text-sm text-gray-500">Hora:</p>
+                        <p className="font-medium">{watch('hora') || 'No seleccionada'}</p>
+                      </div>
+                      <div className="space-y-2">
+                        <p className="text-sm text-gray-500">Precio:</p>
+                        <p className="font-medium text-blue-600">
+                          ${masajes.find(m => m.id === watch('tipoMasaje'))?.precio || '--'}
+                        </p>
+                      </div>
+                      <div className="space-y-2">
+                        <p className="text-sm text-gray-500">Método de pago:</p>
+                        <p className="font-medium capitalize">
+                          {watch('metodoPago') === 'efectivo' ? 'Efectivo' : 'No seleccionado'}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="pt-4 border-t">
+                      <h4 className="text-sm font-medium text-gray-700 mb-2">Datos de contacto</h4>
+                      <p className="text-gray-800">{watch('nombre')}</p>
+                      <p className="text-gray-600 text-sm">{watch('email')}</p>
+                      <p className="text-gray-600 text-sm">{watch('telefono') || 'No proporcionado'}</p>
+                    </div>
+                    {watch('comentarios') && (
+                      <div className="pt-4 border-t">
+                        <h4 className="text-sm font-medium text-gray-700 mb-2">Comentarios adicionales</h4>
+                        <p className="text-gray-600">{watch('comentarios')}</p>
+                      </div>
+                    )}
+                  </div>
+                  <div className="flex justify-between pt-4">
+                    <button
+                      type="button"
+                      onClick={prevStep}
+                      className="text-gray-600 hover:text-gray-800 font-medium py-2 px-6 rounded-lg border border-gray-300 hover:border-gray-400 transition duration-200 flex items-center"
+                    >
+                      <FiArrowLeft className="mr-2" /> Atrás
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={isSubmitting}
+                      className="bg-green-600 hover:bg-green-700 text-white font-medium py-2 px-6 rounded-lg disabled:bg-gray-400 transition duration-200 flex items-center"
+                    >
+                      {isSubmitting ? 'Confirmando...' : 'Confirmar reserva'}
+                    </button>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </form>
+        )}
+      </div>
     </div>
   );
 }
