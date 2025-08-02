@@ -37,25 +37,25 @@ const WORKING_HOURS = {
 
 const TIME_SLOT_INTERVAL = 30;
 
+// Esquema corregido según la nueva sintaxis de Zod
 const baseReservaSchema = z.object({
   tipoMasaje: z.number({
-    required_error: 'Seleccione un tipo de masaje',
-    invalid_type_error: 'ID de masaje inválido'
-  }),
+    description: 'Tipo de masaje',
+  }).min(1, 'Seleccione un tipo de masaje'),
+  
   fecha: z.date({
-    required_error: 'Seleccione una fecha',
+    description: 'Fecha de reserva',
     invalid_type_error: 'Fecha inválida'
   }).refine(date => isAfter(date, new Date()), {
     message: 'La fecha debe ser futura'
   }),
-  hora: z.string().min(1, { message: 'Seleccione una hora' }),
-  nombre: z.string().min(2, { message: 'Mínimo 2 caracteres' }),
-  email: z.string().email({ message: 'Email inválido' }),
-  telefono: z.string().min(8, { message: 'Mínimo 8 caracteres' }),
-  comentarios: z.string().max(500, { message: 'Máximo 500 caracteres' }).optional(),
-  metodoPago: z.enum(['transferencia', 'efectivo'], {
-    required_error: 'Seleccione un método de pago'
-  }),
+  
+  hora: z.string().min(1, 'Seleccione una hora'),
+  nombre: z.string().min(2, 'Mínimo 2 caracteres'),
+  email: z.string().email('Email inválido'),
+  telefono: z.string().min(8, 'Mínimo 8 caracteres'),
+  comentarios: z.string().max(500, 'Máximo 500 caracteres').optional(),
+  metodoPago: z.enum(['transferencia', 'efectivo']).default('efectivo')
 });
 
 type ReservaFormData = z.infer<typeof baseReservaSchema>;
@@ -92,7 +92,7 @@ export default function ReservasPage() {
       email: '',
       telefono: '',
       comentarios: '',
-      metodoPago: 'efectivo', // Establecer efectivo como predeterminado
+      metodoPago: 'efectivo',
     },
   });
 
