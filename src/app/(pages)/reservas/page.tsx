@@ -37,25 +37,19 @@ const WORKING_HOURS = {
 
 const TIME_SLOT_INTERVAL = 30;
 
-// Esquema corregido según la nueva sintaxis de Zod
+// Esquema simplificado y compatible
 const baseReservaSchema = z.object({
-  tipoMasaje: z.number({
-    description: 'Tipo de masaje',
-  }).min(1, 'Seleccione un tipo de masaje'),
-  
-  fecha: z.date({
-    description: 'Fecha de reserva',
-    invalid_type_error: 'Fecha inválida'
-  }).refine(date => isAfter(date, new Date()), {
-    message: 'La fecha debe ser futura'
-  }),
-  
+  tipoMasaje: z.number().min(1, 'Seleccione un tipo de masaje'),
+  fecha: z.date()
+    .refine(date => isAfter(date, new Date()), {
+      message: 'La fecha debe ser futura'
+    }),
   hora: z.string().min(1, 'Seleccione una hora'),
   nombre: z.string().min(2, 'Mínimo 2 caracteres'),
   email: z.string().email('Email inválido'),
   telefono: z.string().min(8, 'Mínimo 8 caracteres'),
   comentarios: z.string().max(500, 'Máximo 500 caracteres').optional(),
-  metodoPago: z.enum(['transferencia', 'efectivo']).default('efectivo')
+  metodoPago: z.enum(['transferencia', 'efectivo'])
 });
 
 type ReservaFormData = z.infer<typeof baseReservaSchema>;
