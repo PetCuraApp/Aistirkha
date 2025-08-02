@@ -64,7 +64,7 @@ export default function NosotrosPage() {
         >
           <div className="relative h-96 rounded-lg overflow-hidden shadow-xl">
             <Image
-              src="/https://odrnnqzdvisynnyspqco.supabase.co/storage/v1/object/public/masajes//masaje1.png"
+              src="https://odrnnqzdvisynnyspqco.supabase.co/storage/v1/object/public/masajes/masaje1.png"
               alt="Historia de Aistirkha Massage"
               fill
               style={{ objectFit: 'cover' }}
