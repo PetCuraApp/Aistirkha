@@ -13,6 +13,7 @@ import { es } from 'date-fns/locale';
 import { FiCheckCircle, FiArrowLeft, FiArrowRight, FiCreditCard } from 'react-icons/fi';
 import 'react-datepicker/dist/react-datepicker.css';
 
+// Tipos de datos
 type Masaje = {
   id: number;
   nombre: string;
@@ -30,6 +31,7 @@ type UserDetails = {
   rol: string;
 };
 
+// Configuración de horarios
 const WORKING_HOURS = {
   start: 9,
   end: 19
@@ -37,19 +39,18 @@ const WORKING_HOURS = {
 
 const TIME_SLOT_INTERVAL = 30;
 
-// Esquema simplificado y compatible
+// Esquema de validación corregido y simplificado
 const baseReservaSchema = z.object({
   tipoMasaje: z.number().min(1, 'Seleccione un tipo de masaje'),
-  fecha: z.date()
-    .refine(date => isAfter(date, new Date()), {
-      message: 'La fecha debe ser futura'
-    }),
+  fecha: z.date().refine(date => isAfter(date, new Date()), {
+    message: 'La fecha debe ser futura'
+  }),
   hora: z.string().min(1, 'Seleccione una hora'),
   nombre: z.string().min(2, 'Mínimo 2 caracteres'),
   email: z.string().email('Email inválido'),
   telefono: z.string().min(8, 'Mínimo 8 caracteres'),
   comentarios: z.string().max(500, 'Máximo 500 caracteres').optional(),
-  metodoPago: z.enum(['transferencia', 'efectivo'])
+  metodoPago: z.enum(['efectivo', 'transferencia'])
 });
 
 type ReservaFormData = z.infer<typeof baseReservaSchema>;
@@ -94,10 +95,11 @@ export default function ReservasPage() {
   const tipoMasaje = watch('tipoMasaje');
   const metodoPago = watch('metodoPago');
 
+  // Cargar datos iniciales
   useEffect(() => {
     const loadData = async () => {
       try {
-        // Cargar los tipos de masaje
+        // Cargar tipos de masaje
         const { data: masajesData, error: masajesError } = await supabase
           .from('masajes')
           .select('*')
@@ -115,7 +117,7 @@ export default function ReservasPage() {
         setUser(session?.user ?? null);
         
         if (session?.user) {
-          // Obtener detalles del usuario desde la tabla usuarios
+          // Obtener detalles del usuario
           const { data: userData, error: userError } = await supabase
             .from('usuarios')
             .select('*')
@@ -147,6 +149,7 @@ export default function ReservasPage() {
     loadData();
   }, [supabase, setValue]);
 
+  // Obtener horarios disponibles
   useEffect(() => {
     const fetchAvailableTimes = async () => {
       if (!selectedDate) return;
@@ -176,6 +179,7 @@ export default function ReservasPage() {
     }
   }, [selectedDate, supabase]);
 
+  // Generar franjas horarias
   const generateTimeSlots = () => {
     const slots: string[] = [];
     const startHour = WORKING_HOURS.start;
@@ -189,16 +193,16 @@ export default function ReservasPage() {
     return slots;
   };
 
+  // Validar paso 3 según si el usuario está logueado o no
   const validateStep3 = async () => {
     if (user) {
-      // Para usuarios logueados solo validamos el método de pago
       return await trigger('metodoPago');
     } else {
-      // Para invitados validamos todos los campos
       return await trigger(['nombre', 'email', 'telefono', 'metodoPago']);
     }
   };
 
+  // Avanzar al siguiente paso
   const nextStep = async () => {
     let isValid = false;
     
@@ -219,13 +223,13 @@ export default function ReservasPage() {
     if (isValid) {
       setStep(prev => prev + 1);
     } else {
-      // Mostrar errores específicos
       if (step === 3 && !metodoPago) {
         setError('Por favor seleccione un método de pago');
       }
     }
   };
 
+  // Enviar formulario
   const onSubmit = async (data: ReservaFormData) => {
     setIsSubmitting(true);
     setError(null);
@@ -267,7 +271,10 @@ export default function ReservasPage() {
     }
   };
 
+  // Retroceder al paso anterior
   const prevStep = () => setStep(prev => prev - 1);
+
+  // Reiniciar formulario
   const resetForm = () => {
     setSuccess(false);
     setStep(1);
@@ -279,6 +286,7 @@ export default function ReservasPage() {
       <div className="p-6 md:p-8">
         <h1 className="text-3xl font-bold text-center text-gray-800 mb-8">Reserva tu sesión de masaje</h1>
         
+        {/* Indicador de pasos */}
         <div className="flex justify-between mb-8">
           {[1, 2, 3, 4].map((stepNumber) => (
             <div key={stepNumber} className="flex flex-col items-center">
@@ -294,19 +302,21 @@ export default function ReservasPage() {
           ))}
         </div>
 
+        {/* Mensaje de error */}
         {error && (
           <div className="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 mb-6 rounded">
             <p>{error}</p>
           </div>
         )}
 
+        {/* Estado de éxito */}
         {success ? (
           <div className="text-center py-12">
             <div className="inline-flex items-center justify-center w-20 h-20 bg-green-100 rounded-full mb-6">
               <FiCheckCircle className="text-green-600 text-4xl" />
             </div>
             <h2 className="text-2xl font-bold text-gray-800 mb-4">¡Reserva confirmada!</h2>
-            <p className="text-gray-600 mb-8">Hemos recibido correctamenta tu reserva. En breve nos contactaremos contigo.</p>
+            <p className="text-gray-600 mb-8">Hemos recibido correctamente tu reserva. En breve nos contactaremos contigo.</p>
             <button
               onClick={resetForm}
               className="bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-6 rounded-lg transition duration-200"
@@ -507,12 +517,17 @@ export default function ReservasPage() {
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Método de pago</label>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-2">
-                      <label className={`border rounded-lg p-4 cursor-not-allowed bg-gray-100 transition-all
-                        ${watch('metodoPago') === 'tarjeta' ? 'border-blue-500 bg-blue-50' : 'border-gray-200'}`}>
-                        <input type="radio" disabled className="hidden" />
+                      <label className={`border rounded-lg p-4 cursor-pointer transition-all
+                        ${watch('metodoPago') === 'transferencia' ? 'border-blue-500 bg-blue-50' : 'border-gray-200 hover:border-blue-300'}`}>
+                        <input
+                          type="radio"
+                          {...register('metodoPago')}
+                          value="transferencia"
+                          className="hidden"
+                        />
                         <div className="flex items-center">
                           <FiCreditCard className="text-gray-500 mr-3" />
-                          <span className="text-gray-500">Tarjeta (Próximamente)</span>
+                          <span>Transferencia</span>
                         </div>
                       </label>
                       <label className={`border rounded-lg p-4 cursor-pointer transition-all
@@ -602,7 +617,7 @@ export default function ReservasPage() {
                       <div className="space-y-2">
                         <p className="text-sm text-gray-500">Método de pago:</p>
                         <p className="font-medium capitalize">
-                          {watch('metodoPago') === 'efectivo' ? 'Efectivo' : 'No seleccionado'}
+                          {watch('metodoPago') === 'efectivo' ? 'Efectivo' : 'Transferencia'}
                         </p>
                       </div>
                     </div>
