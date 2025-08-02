@@ -5,33 +5,59 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
 import { FiCalendar, FiClock, FiAward, FiUsers } from 'react-icons/fi';
+import { createClient } from '@/utils/supabase/client';
+
+type MasajePreview = {
+  id: string;
+  nombre: string;
+  descripcion_corta?: string;
+  descripcion?: string;
+  duracion: number;
+  precio: number;
+  imagen_url?: string;
+};
 
 export default function HomePage() {
-  type MasajePreview = {
-    id: string;
-    nombre: string;
-    descripcion_corta?: string;
-    descripcion?: string;
-    duracion: number;
-    precio: number;
-    imagen_url?: string;
-  };
   const [masajesPreview, setMasajesPreview] = useState<MasajePreview[]>([]);
-
-  useEffect(() => {
-    async function fetchMasajesPreview() {
-      const supabase = require('@/utils/supabase/client').createClient();
-      const { data, error } = await supabase.from('masajes').select('*').order('id', { ascending: true }).limit(3);
-      if (!error && data) {
-        setMasajesPreview(data);
-      }
-    }
-    fetchMasajesPreview();
-  }, []);
   const [isLoaded, setIsLoaded] = useState(false);
 
   useEffect(() => {
     setIsLoaded(true);
+  }, []);
+
+  const fetchMasajes = async () => {
+    try {
+      const supabase = createClient();
+      const { data, error, status } = await supabase
+        .from('masajes')
+        .select('*')
+        .order('id', { ascending: true })
+        .limit(3);
+
+      if (error || !data) {
+        throw error || new Error('No se pudo obtener la data');
+      }
+
+      setMasajesPreview(data);
+    } catch (error) {
+      console.warn('Error al cargar masajes, reintentando en 5 segundos...', error);
+
+      // 👇 Limpiar sesión rota de Supabase
+      try {
+        const supabase = createClient();
+        await supabase.auth.signOut();
+      } catch (logoutError) {
+        console.error('Error al limpiar la sesión:', logoutError);
+      }
+
+      setTimeout(() => {
+        fetchMasajes();
+      }, 5000);
+    }
+  };
+
+  useEffect(() => {
+    fetchMasajes();
   }, []);
 
   const fadeIn = {
@@ -67,7 +93,7 @@ export default function HomePage() {
         <motion.div
           className="relative z-10 text-center text-white px-4 sm:px-6 lg:px-8 max-w-4xl"
           initial="hidden"
-          animate={isLoaded ? "visible" : "hidden"}
+          animate={isLoaded ? 'visible' : 'hidden'}
           variants={staggerContainer}
         >
           <motion.h1
@@ -115,13 +141,14 @@ export default function HomePage() {
               {
                 icon: <FiAward className="h-10 w-10 text-teal-500" />,
                 title: 'Profesionales Certificados',
-                description: 'Nuestro equipo está formado por terapeutas certificados con años de experiencia.',
+                description:
+                  'Nuestro equipo está formado por terapeutas certificados con años de experiencia.',
               },
-              
               {
                 icon: <FiUsers className="h-10 w-10 text-teal-500" />,
                 title: 'Atención Personalizada',
-                description: 'Cada sesión se adapta a tus necesidades específicas y preferencias.',
+                description:
+                  'Cada sesión se adapta a tus necesidades específicas y preferencias.',
               },
               {
                 icon: <FiCalendar className="h-10 w-10 text-teal-500" />,
@@ -163,7 +190,9 @@ export default function HomePage() {
           </motion.div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            {masajesPreview.length > 0 ? (
+            {masajesPreview.length === 0 ? (
+              <p className="text-center text-gray-500">Cargando masajes...</p>
+            ) : (
               masajesPreview.map((service, index) => (
                 <motion.div
                   key={service.id}
@@ -184,7 +213,9 @@ export default function HomePage() {
                   </div>
                   <div className="p-6">
                     <h3 className="text-xl font-semibold mb-2 text-gray-900">{service.nombre}</h3>
-                    <p className="text-gray-600 mb-4">{service.descripcion_corta || service.descripcion || ''}</p>
+                    <p className="text-gray-600 mb-4">
+                      {service.descripcion_corta || service.descripcion || ''}
+                    </p>
                     <div className="flex justify-between items-center">
                       <span className="text-teal-600 font-bold">${service.precio}</span>
                       <span className="text-gray-500 flex items-center">
@@ -194,8 +225,6 @@ export default function HomePage() {
                   </div>
                 </motion.div>
               ))
-            ) : (
-              <p>Cargando masajes...</p>
             )}
           </div>
 

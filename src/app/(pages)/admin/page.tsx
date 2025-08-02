@@ -49,7 +49,7 @@ export default function AdminPage() {
     descripcion_larga: '',
     precio: '',
     duracion: '',
-    imagen: null as File | null,
+    imagen_url: null as File | null,
   });
   const [subiendo, setSubiendo] = useState(false);
   const [errorMasaje, setErrorMasaje] = useState<string | null>(null);
@@ -148,17 +148,17 @@ export default function AdminPage() {
     const supabaseClient = createClient();
     try {
       let imagen_url = null;
-      if (nuevoMasaje.imagen) {
-        const file = nuevoMasaje.imagen;
+      if (nuevoMasaje.imagen_url) {
+        const file = nuevoMasaje.imagen_url;
         const filePath = `masajes/${Date.now()}_${file.name}`;
         const { error: uploadError } = await supabaseClient.storage.from('masajes').upload(filePath, file);
         if (uploadError) throw uploadError;
         const { data: urlData } = supabaseClient.storage.from('masajes').getPublicUrl(filePath);
         imagen_url = urlData?.publicUrl;
       }
-      const { error: insertError } = await supabaseClient.from('masajes').insert([{ ...nuevoMasaje, precio: parseFloat(nuevoMasaje.precio), duracion: parseInt(nuevoMasaje.duracion), imagen: undefined, imagen_url }]);
+      const { error: insertError } = await supabaseClient.from('masajes').insert([{ ...nuevoMasaje, precio: parseFloat(nuevoMasaje.precio), duracion: parseInt(nuevoMasaje.duracion), imagen_url }]);
       if (insertError) throw insertError;
-      setNuevoMasaje({ nombre: '', descripcion_corta: '', descripcion_larga: '', precio: '', duracion: '', imagen: null });
+      setNuevoMasaje({ nombre: '', descripcion_corta: '', descripcion_larga: '', precio: '', duracion: '', imagen_url: null });
       await loadData();
     } catch (err: any) { setErrorMasaje(err.message); } 
     finally { setSubiendo(false); }
@@ -240,7 +240,7 @@ export default function AdminPage() {
                       <div className="md:col-span-2"><label className="block text-sm font-medium text-gray-700">Descripción larga</label><textarea rows={3} value={nuevoMasaje.descripcion_larga} onChange={e => setNuevoMasaje({ ...nuevoMasaje, descripcion_larga: e.target.value })} className="mt-1 block w-full border rounded px-3 py-2"/></div>
                       <div><label className="block text-sm font-medium text-gray-700">Precio</label><input type="number" step="0.01" value={nuevoMasaje.precio} onChange={e => setNuevoMasaje({ ...nuevoMasaje, precio: e.target.value })} required className="mt-1 block w-full border rounded px-3 py-2"/></div>
                       <div><label className="block text-sm font-medium text-gray-700">Duración (minutos)</label><input type="number" value={nuevoMasaje.duracion} onChange={e => setNuevoMasaje({ ...nuevoMasaje, duracion: e.target.value })} required className="mt-1 block w-full border rounded px-3 py-2"/></div>
-                      <div className="md:col-span-2"><label htmlFor="file-upload" className="cursor-pointer bg-white border border-gray-300 rounded-md px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 flex items-center gap-2 w-max"><FiUpload /><span>{nuevoMasaje.imagen ? nuevoMasaje.imagen.name : 'Subir Imagen'}</span></label><input id="file-upload" type="file" className="sr-only" onChange={e => setNuevoMasaje({ ...nuevoMasaje, imagen: e.target.files?.[0] || null })}/></div>
+                      <div className="md:col-span-2"><label htmlFor="file-upload" className="cursor-pointer bg-white border border-gray-300 rounded-md px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 flex items-center gap-2 w-max"><FiUpload /><span>{nuevoMasaje.imagen_url ? nuevoMasaje.imagen_url.name : 'Subir Imagen'}</span></label><input id="file-upload" type="file" className="sr-only" onChange={e => setNuevoMasaje({ ...nuevoMasaje, imagen_url: e.target.files?.[0] || null })}/></div>
                       <div className="md:col-span-2"><button type="submit" disabled={subiendo} className="bg-teal-600 text-white px-4 py-2 rounded hover:bg-teal-700 disabled:opacity-50">{subiendo ? 'Guardando...' : 'Guardar Masaje'}</button>{errorMasaje && <span className="text-red-600 text-sm ml-4">{errorMasaje}</span>}</div>
                     </form>
                   </div>
