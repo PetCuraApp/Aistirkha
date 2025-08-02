@@ -10,7 +10,7 @@ const teamMembers = [
     name: 'Katherine Quiroz',
     role: 'Fundadora & Terapeuta',
     bio: 'Con más de 7 años de experiencia en masajes terapéuticos, Katherine fundó Aistirkha con la visión de crear un espacio dedicado al bienestar integral.',
-    image: '/images/katherine.jpg',
+    image: 'https://odrnnqzdvisynnyspqco.supabase.co/storage/v1/object/public/masajes//Katherine.jpg',
   },
 
 ];
@@ -64,7 +64,7 @@ export default function NosotrosPage() {
         >
           <div className="relative h-96 rounded-lg overflow-hidden shadow-xl">
             <Image
-              src="/images/masaje1.png "
+              src="/https://odrnnqzdvisynnyspqco.supabase.co/storage/v1/object/public/masajes//masaje1.png"
               alt="Historia de Aistirkha Massage"
               fill
               style={{ objectFit: 'cover' }}
