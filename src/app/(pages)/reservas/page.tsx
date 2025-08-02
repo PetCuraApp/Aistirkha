@@ -310,11 +310,30 @@ export default function ReservasPage() {
   // Retroceder al paso anterior
   const prevStep = () => setStep(prev => prev - 1);
 
-  // Reiniciar formulario
-  const resetForm = () => {
+  // Reemplaza tu función resetForm existente por esta:
+const resetForm = () => {
     setSuccess(false);
     setStep(1);
-    reset();
+    
+    // Si tenemos los detalles de un usuario logueado en el estado del componente...
+    if (userDetails) {
+      // ...reseteamos el formulario, pero pasándole los datos del usuario.
+      reset({
+        nombre: userDetails.nombre || '',
+        email: userDetails.email || '',
+        telefono: userDetails.telefono || '',
+        // También reseteamos los otros campos a su estado inicial
+        tipoMasaje: undefined,
+        fecha: undefined,
+        hora: '',
+        comentarios: '',
+        metodoPago: 'efectivo',
+      });
+    } else {
+      // Si no hay un usuario (es un invitado), usamos el comportamiento original.
+      // Esto limpiará todos los campos que el invitado haya llenado.
+      reset(); 
+    }
   };
 
   return (
