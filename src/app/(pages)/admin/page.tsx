@@ -67,33 +67,37 @@ export default function AdminPage() {
     checkAdminStatus();
   }, [router]);
 
+  // Mover loadData al scope principal del componente
   useEffect(() => {
-    const loadData = async () => {
-      if (!isAdmin) return;
-      setLoading(true);
-      setError(null);
-      try {
-        const supabaseClient = createClient();
-        if (tab === 'reservas') {
-          const { data, error } = await supabaseClient.from('reservas').select(`*, usuario:usuarios(nombre, email, telefono), masaje:masajes(nombre, precio, duracion)`).order('fecha', { ascending: false });
-          if (error) throw error;
-          setReservas(data as Reserva[]);
-        } else if (tab === 'usuarios') {
-          const { data, error } = await supabaseClient.from('usuarios').select('*').order('created_at', { ascending: false });
-          if (error) throw error;
-          setUsuarios(data as Usuario[]);
-        } else if (tab === 'masajes') {
-          const { data, error } = await supabaseClient.from('masajes').select('*').order('id', { ascending: true });
-          if (error) throw error;
-          setMasajes(data);
-        }
-      } catch (err: any) { setError(`Error al cargar ${tab}: ${err.message}`); } 
-      finally { setLoading(false); }
-    };
     if (isAdmin) { loadData(); }
   }, [tab, isAdmin]);
 
+
   // --- FUNCIONES DE ACCIÓN (COMPLETAS Y RESTAURADAS) ---
+
+  // Definir loadData en el scope principal del componente
+  const loadData = async () => {
+    if (!isAdmin) return;
+    setLoading(true);
+    setError(null);
+    try {
+      const supabaseClient = createClient();
+      if (tab === 'reservas') {
+        const { data, error } = await supabaseClient.from('reservas').select(`*, usuario:usuarios(nombre, email, telefono), masaje:masajes(nombre, precio, duracion)`).order('fecha', { ascending: false });
+        if (error) throw error;
+        setReservas(data as Reserva[]);
+      } else if (tab === 'usuarios') {
+        const { data, error } = await supabaseClient.from('usuarios').select('*').order('created_at', { ascending: false });
+        if (error) throw error;
+        setUsuarios(data as Usuario[]);
+      } else if (tab === 'masajes') {
+        const { data, error } = await supabaseClient.from('masajes').select('*').order('id', { ascending: true });
+        if (error) throw error;
+        setMasajes(data);
+      }
+    } catch (err: any) { setError(`Error al cargar ${tab}: ${err.message}`); } 
+    finally { setLoading(false); }
+  };
 
   const updateReservaStatus = async (id: string, estado: Reserva['estado']) => {
     try {
