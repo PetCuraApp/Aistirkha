@@ -20,44 +20,77 @@ type MasajePreview = {
 export default function HomePage() {
   const [masajesPreview, setMasajesPreview] = useState<MasajePreview[]>([]);
   const [isLoaded, setIsLoaded] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
 
-  useEffect(() => {
-    setIsLoaded(true);
-  }, []);
-
-  const fetchMasajes = async () => {
+  const fetchMasajes = async (attempt = 0): Promise<void> => {
+    const MAX_ATTEMPTS = 3;
+    const BASE_DELAY = 1000;
+    
     try {
+      setIsLoading(true);
       const supabase = createClient();
-      const { data, error, status } = await supabase
+      
+      // Verificar y renovar sesión si es necesario
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        await supabase.auth.refreshSession();
+      }
+
+      const { data, error } = await supabase
         .from('masajes')
         .select('*')
         .order('id', { ascending: true })
         .limit(3);
 
-      if (error || !data) {
-        throw error || new Error('No se pudo obtener la data');
-      }
+      if (error) throw error;
 
-      setMasajesPreview(data);
+      // Actualizar estado y caché local
+      setMasajesPreview(data || []);
+      localStorage.setItem('masajesCache', JSON.stringify(data || []));
+      localStorage.setItem('masajesTimestamp', Date.now().toString());
+      
     } catch (error) {
-      console.warn('Error al cargar masajes, reintentando en 5 segundos...', error);
-
-      // 👇 Limpiar sesión rota de Supabase
-      try {
-        const supabase = createClient();
-        await supabase.auth.signOut();
-      } catch (logoutError) {
-        console.error('Error al limpiar la sesión:', logoutError);
+      console.error('Error fetching masajes:', error);
+      
+      if (attempt < MAX_ATTEMPTS) {
+        // Backoff exponencial con límite
+        const delay = Math.min(BASE_DELAY * Math.pow(2, attempt), 8000);
+        await new Promise(resolve => setTimeout(resolve, delay));
+        return fetchMasajes(attempt + 1);
       }
-
-      setTimeout(() => {
-        fetchMasajes();
-      }, 5000);
+      
+      // Si fallan todos los intentos, usar caché si existe
+      const cachedData = localStorage.getItem('masajesCache');
+      if (cachedData) {
+        setMasajesPreview(JSON.parse(cachedData));
+      }
+      
+    } finally {
+      setIsLoading(false);
     }
   };
 
   useEffect(() => {
+    // Cargar datos iniciales desde caché si están frescos (<1 hora)
+    const cachedData = localStorage.getItem('masajesCache');
+    const cacheTime = localStorage.getItem('masajesTimestamp');
+    
+    if (cachedData && cacheTime) {
+      const isCacheFresh = Date.now() - Number(cacheTime) < 3600000; // 1 hora
+      if (isCacheFresh) {
+        setMasajesPreview(JSON.parse(cachedData));
+        setIsLoading(false);
+      }
+    }
+
+    // Luego cargar datos frescos
     fetchMasajes();
+    setIsLoaded(true);
+
+    // Configurar recarga periódica cada 5 minutos
+    const reloadInterval = setInterval(fetchMasajes, 300000);
+    
+    return () => clearInterval(reloadInterval);
   }, []);
 
   const fadeIn = {
@@ -190,8 +223,21 @@ export default function HomePage() {
           </motion.div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            {masajesPreview.length === 0 ? (
-              <p className="text-center text-gray-500">Cargando masajes...</p>
+            {isLoading && masajesPreview.length === 0 ? (
+              <div className="col-span-3 text-center">
+                <div className="inline-block animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-teal-500 mb-2"></div>
+                <p className="text-gray-500">Cargando masajes...</p>
+              </div>
+            ) : masajesPreview.length === 0 ? (
+              <div className="col-span-3 text-center">
+                <p className="text-gray-500">No se pudieron cargar los servicios en este momento</p>
+                <button 
+                  onClick={() => fetchMasajes()} 
+                  className="mt-4 text-teal-600 hover:text-teal-700 font-medium"
+                >
+                  Reintentar
+                </button>
+              </div>
             ) : (
               masajesPreview.map((service, index) => (
                 <motion.div
@@ -228,32 +274,34 @@ export default function HomePage() {
             )}
           </div>
 
-          <motion.div
-            className="text-center mt-12"
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.5 }}
-          >
-            <Link
-              href="/productos"
-              className="text-teal-600 font-medium hover:text-teal-700 transition-colors duration-200 inline-flex items-center"
+          {masajesPreview.length > 0 && (
+            <motion.div
+              className="text-center mt-12"
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              transition={{ duration: 0.5 }}
             >
-              Ver todos los servicios
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                className="h-5 w-5 ml-1"
-                viewBox="0 0 20 20"
-                fill="currentColor"
+              <Link
+                href="/productos"
+                className="text-teal-600 font-medium hover:text-teal-700 transition-colors duration-200 inline-flex items-center"
               >
-                <path
-                  fillRule="evenodd"
-                  d="M10.293 5.293a1 1 0 011.414 0l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414-1.414L12.586 11H5a1 1 0 110-2h7.586l-2.293-2.293a1 1 0 010-1.414z"
-                  clipRule="evenodd"
-                />
-              </svg>
-            </Link>
-          </motion.div>
+                Ver todos los servicios
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  className="h-5 w-5 ml-1"
+                  viewBox="0 0 20 20"
+                  fill="currentColor"
+                >
+                  <path
+                    fillRule="evenodd"
+                    d="M10.293 5.293a1 1 0 011.414 0l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414-1.414L12.586 11H5a1 1 0 110-2h7.586l-2.293-2.293a1 1 0 010-1.414z"
+                    clipRule="evenodd"
+                  />
+                </svg>
+              </Link>
+            </motion.div>
+          )}
         </div>
       </section>
 
