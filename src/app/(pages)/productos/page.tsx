@@ -17,7 +17,24 @@ type Masaje = {
 export default function ProductosPage() {
   const [masajes, setMasajes] = useState<Masaje[]>([]);
 
-  // Cargar masajes
+  // 🔄 Forzar recarga una sola vez por visita (funciona bien en móvil)
+  useEffect(() => {
+    const alreadyReloaded = sessionStorage.getItem('productos_reloaded');
+
+    if (!alreadyReloaded) {
+      sessionStorage.setItem('productos_reloaded', 'true');
+      location.reload();
+    }
+  }, []);
+
+  // 🔁 Limpiar bandera al desmontar (permite recarga en próxima visita)
+  useEffect(() => {
+    return () => {
+      sessionStorage.removeItem('productos_reloaded');
+    };
+  }, []);
+
+  // 🔃 Cargar masajes
   useEffect(() => {
     async function fetchMasajes() {
       const supabase = createClient();
@@ -33,27 +50,6 @@ export default function ProductosPage() {
       }
     }
     fetchMasajes();
-  }, []);
-
-  // Recargar solo una vez al volver a la pestaña
-  useEffect(() => {
-    const handleVisibility = () => {
-      const alreadyReloaded = sessionStorage.getItem('productos_reloaded');
-      if (document.visibilityState === 'visible' && alreadyReloaded !== 'true') {
-        sessionStorage.setItem('productos_reloaded', 'true');
-        location.reload();
-      }
-    };
-
-    document.addEventListener('visibilitychange', handleVisibility);
-    return () => {
-      document.removeEventListener('visibilitychange', handleVisibility);
-    };
-  }, []);
-
-  // Limpiar la bandera al montar (para permitir próxima recarga)
-  useEffect(() => {
-    sessionStorage.removeItem('productos_reloaded');
   }, []);
 
   return (
