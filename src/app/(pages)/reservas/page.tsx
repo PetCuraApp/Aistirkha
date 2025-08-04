@@ -36,6 +36,7 @@ const WORKING_HOURS = {
   start: 9,
   end: 19
 };
+const WORKING_DAYS = [1, 2, 3, 4, 5]; // Lunes a Viernes
 
 const TIME_SLOT_INTERVAL = 60;
 
@@ -451,6 +452,7 @@ const resetForm = () => {
                               field.onChange(date);
                               setValue('hora', '');
                             }}
+                            filterDate={(date) => WORKING_DAYS.includes(date.getDay())}
                             minDate={new Date()}
                             maxDate={addDays(new Date(), 30)}
                             dateFormat="dd/MM/yyyy"
