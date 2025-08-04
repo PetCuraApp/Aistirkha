@@ -1,4 +1,3 @@
-
 'use client';
 import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
@@ -18,10 +17,15 @@ type Masaje = {
 export default function ProductosPage() {
   const [masajes, setMasajes] = useState<Masaje[]>([]);
 
+  // Cargar masajes
   useEffect(() => {
     async function fetchMasajes() {
       const supabase = createClient();
-      const { data, error } = await supabase.from('masajes').select('*').order('id', { ascending: true });
+      const { data, error } = await supabase
+        .from('masajes')
+        .select('*')
+        .order('id', { ascending: true });
+
       if (error) {
         console.error('Error fetching masajes:', error);
       } else {
@@ -29,6 +33,27 @@ export default function ProductosPage() {
       }
     }
     fetchMasajes();
+  }, []);
+
+  // Recargar solo una vez al volver a la pestaña
+  useEffect(() => {
+    const handleVisibility = () => {
+      const alreadyReloaded = sessionStorage.getItem('productos_reloaded');
+      if (document.visibilityState === 'visible' && alreadyReloaded !== 'true') {
+        sessionStorage.setItem('productos_reloaded', 'true');
+        location.reload();
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibility);
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibility);
+    };
+  }, []);
+
+  // Limpiar la bandera al montar (para permitir próxima recarga)
+  useEffect(() => {
+    sessionStorage.removeItem('productos_reloaded');
   }, []);
 
   return (
