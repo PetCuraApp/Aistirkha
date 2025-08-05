@@ -213,7 +213,7 @@ export default function ClientePage() {
     try {
       console.log('Cerrando sesión desde cliente/page.tsx...');
       
-      const { error } = await supabaseClient.auth.signOut();
+      const { error } = await supabase.auth.signOut();
       
       if (error) {
         console.error('Error al cerrar sesión:', error.message);
