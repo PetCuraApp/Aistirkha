@@ -6,7 +6,7 @@ import { motion } from 'framer-motion';
 import { FiCalendar, FiUser, FiEdit, FiTrash2, FiClock, FiMapPin, FiDollarSign } from 'react-icons/fi';
 import Link from 'next/link';
 import type { Database } from '@/types/supabase';
-import { createClient } from '@/utils/supabase/client';
+import { supabase } from '@/utils/supabase/client';
 import { getSessionClient, getUserDetailsClient } from '@/lib/authClient';
 
 type Reserva = {
@@ -48,7 +48,7 @@ export default function ClientePage() {
     telefono: '',
   });
   const router = useRouter();
-  const supabase = createClient();
+  
 
   useEffect(() => {
     const checkAuthStatus = async () => {
@@ -212,7 +212,7 @@ export default function ClientePage() {
   const handleLogout = async () => {
     try {
       console.log('Cerrando sesión desde cliente/page.tsx...');
-      const supabaseClient = createClient();
+      
       const { error } = await supabaseClient.auth.signOut();
       
       if (error) {

@@ -2,7 +2,7 @@
 import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import MassageCard from '@/components/MassageCard';
-import { createClient } from '@/utils/supabase/client';
+import { supabase } from '@/utils/supabase/client';
 
 type Masaje = {
   id: string;
@@ -20,7 +20,7 @@ export default function ProductosPage() {
   // Cargar masajes
   useEffect(() => {
     async function fetchMasajes() {
-      const supabase = createClient();
+    
       const { data, error } = await supabase
         .from('masajes')
         .select('*')

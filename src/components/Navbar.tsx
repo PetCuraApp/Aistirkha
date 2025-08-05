@@ -7,7 +7,7 @@ import { usePathname } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import { FiMenu, FiX, FiUser, FiCalendar, FiSettings } from 'react-icons/fi';
 import type { Database } from '@/types/supabase';
-import { createClient } from '@/utils/supabase/client';
+import { supabase } from '@/utils/supabase/client';
 import { getSessionClient, getUserDetailsClient } from '@/lib/authClient';
 
 export default function Navbar() {
@@ -16,7 +16,7 @@ export default function Navbar() {
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
   const pathname = usePathname();
-  const supabase = createClient();
+  
 
   useEffect(() => {
     const checkUser = async () => {
@@ -107,6 +107,8 @@ export default function Navbar() {
       setIsUserMenuOpen(false);
       setIsAdmin(false);
       setUser(null);
+      // Redirigir a la página de inicio
+      window.location.href = '/';
     } catch (error) {
       console.error('Error al cerrar sesión:', error);
     }

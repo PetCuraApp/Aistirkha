@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { createClient } from '@/utils/supabase/client';
+import { supabase } from '@/utils/supabase/client';
 import { getSessionClient } from '@/lib/authClient';
 import { motion, AnimatePresence } from 'framer-motion';
 import DatePicker from 'react-datepicker';
@@ -57,7 +57,7 @@ const baseReservaSchema = z.object({
 type ReservaFormData = z.infer<typeof baseReservaSchema>;
 
 export default function ReservasPage() {
-  const supabase = createClient();
+  
   const [masajes, setMasajes] = useState<Masaje[]>([]);
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
@@ -114,7 +114,10 @@ export default function ReservasPage() {
         }
 
         // Verificar sesión del usuario
-        const session = await getSessionClient();
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) {
+          await supabase.auth.refreshSession();
+        }
         setUser(session?.user ?? null);
         
         if (session?.user) {
@@ -148,7 +151,28 @@ export default function ReservasPage() {
     };
 
     loadData();
-  }, [supabase, setValue]);
+  }, [setValue]);
+
+  // Recargar solo una vez al volver a la pestaña
+  useEffect(() => {
+    const handleVisibility = () => {
+      const alreadyReloaded = sessionStorage.getItem('reservas_reloaded');
+      if (document.visibilityState === 'visible' && alreadyReloaded !== 'true') {
+        sessionStorage.setItem('reservas_reloaded', 'true');
+        location.reload();
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibility);
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibility);
+    };
+  }, []);
+
+  // Limpiar la bandera al montar (para permitir próxima recarga)
+  useEffect(() => {
+    sessionStorage.removeItem('reservas_reloaded');
+  }, []);
 
   // Generar franjas horarias con disponibilidad
   const generateTimeSlots = (reservedTimes: Set<string>) => {

@@ -1,11 +1,9 @@
-import { createBrowserClient } from '@supabase/ssr';
+// src/utils/supabase/client.ts
+import { createClient } from '@supabase/supabase-js';
 import type { Database } from '@/types/supabase';
 
-export function createClient() {
-  // Simplemente llama a la función sin el objeto de configuración de cookies.
-  // Usará localStorage automáticamente, que es el comportamiento correcto y esperado.
-  return createBrowserClient<Database>(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-  );
-}
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+
+// 👇 Solo se crea una vez. No hay función createClient, se exporta directo
+export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey);

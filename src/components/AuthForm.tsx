@@ -6,7 +6,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { motion } from 'framer-motion';
 import { FiMail, FiLock, FiUser, FiPhone, FiAlertCircle } from 'react-icons/fi';
-import { createClient } from '@/utils/supabase/client';
+import { supabase } from '@/utils/supabase/client';
 import { useRouter } from 'next/navigation';
 import type { Database } from '@/types/supabase';
 
@@ -32,7 +32,7 @@ export default function AuthForm() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
   const router = useRouter();
-  const supabase = createClient();
+  
 
   const {
     register: registerLogin,

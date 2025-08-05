@@ -7,7 +7,7 @@ import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
 import { FiCalendar, FiUsers, FiDollarSign, FiEdit, FiTrash2, FiCheck, FiX, FiUpload } from 'react-icons/fi';
 import { getSessionClient, getUserDetailsClient } from '@/lib/authClient';
-import { createClient } from '@/utils/supabase/client';
+import { supabase } from '@/utils/supabase/client';
 import ReservasSemanal from '@/app/(pages)/admin/ReservasSemanal'; // Asegúrate de que la ruta sea correcta 
 import type { Reserva } from '@/types/admin';
 
@@ -81,17 +81,17 @@ export default function AdminPage() {
     setLoading(true);
     setError(null);
     try {
-      const supabaseClient = createClient();
+    
       if (tab === 'reservas') {
-        const { data, error } = await supabaseClient.from('reservas').select(`*, usuario:usuarios(nombre, email, telefono), masaje:masajes(nombre, precio, duracion)`).order('fecha', { ascending: false });
+        const { data, error } = await supabase.from('reservas').select(`*, usuario:usuarios(nombre, email, telefono), masaje:masajes(nombre, precio, duracion)`).order('fecha', { ascending: false });
         if (error) throw error;
         setReservas(data as Reserva[]);
       } else if (tab === 'usuarios') {
-        const { data, error } = await supabaseClient.from('usuarios').select('*').order('created_at', { ascending: false });
+        const { data, error } = await supabase.from('usuarios').select('*').order('created_at', { ascending: false });
         if (error) throw error;
         setUsuarios(data as Usuario[]);
       } else if (tab === 'masajes') {
-        const { data, error } = await supabaseClient.from('masajes').select('*').order('id', { ascending: true });
+        const { data, error } = await supabase.from('masajes').select('*').order('id', { ascending: true });
         if (error) throw error;
         setMasajes(data);
       }
@@ -101,8 +101,8 @@ export default function AdminPage() {
 
   const updateReservaStatus = async (id: string, estado: Reserva['estado']) => {
     try {
-      const supabaseClient = createClient();
-      const { data: updatedReserva, error } = await supabaseClient.from('reservas').update({ estado }).eq('id', id).select().single();
+      
+      const { data: updatedReserva, error } = await supabase.from('reservas').update({ estado }).eq('id', id).select().single();
       if (error) throw error;
       setReservas(prev => prev.map(r => (r.id === id ? { ...r, ...updatedReserva } : r)));
     } catch (err: any) { alert(`Error al actualizar estado: ${err.message}`); }
@@ -110,8 +110,8 @@ export default function AdminPage() {
   
   const deleteReserva = async (id: string) => {
     try {
-      const supabaseClient = createClient();
-      const { error } = await supabaseClient.from('reservas').delete().eq('id', id);
+      
+      const { error } = await supabase.from('reservas').delete().eq('id', id);
       if (error) throw error;
       setReservas(prev => prev.filter(reserva => reserva.id !== id));
     } catch (err: any) { alert(`Error al eliminar reserva: ${err.message}`); }
@@ -128,8 +128,8 @@ export default function AdminPage() {
   const updateUserRole = async (id: string, rol: Usuario['rol']) => {
     if (!confirm(`¿Seguro que quieres cambiar el rol a ${rol}?`)) return;
     try {
-        const supabaseClient = createClient();
-        const { error } = await supabaseClient.from('usuarios').update({ rol }).eq('id', id);
+       
+        const { error } = await supabase.from('usuarios').update({ rol }).eq('id', id);
         if (error) throw error;
         setUsuarios(usuarios.map(u => (u.id === id ? { ...u, rol } : u)));
     } catch (err: any) { alert(`Error al actualizar rol: ${err.message}`); }
@@ -138,9 +138,9 @@ export default function AdminPage() {
   const deleteUser = async (id: string) => {
     if (!confirm('¿Estás seguro? Se eliminará el usuario y todas sus reservas.')) return;
     try {
-      const supabaseClient = createClient();
-      await supabaseClient.from('reservas').delete().eq('usuario_id', id);
-      await supabaseClient.from('usuarios').delete().eq('id', id);
+      
+      await supabase.from('reservas').delete().eq('usuario_id', id);
+      await supabase.from('usuarios').delete().eq('id', id);
       setUsuarios(usuarios.filter(u => u.id !== id));
     } catch (err: any) { alert(`Error al eliminar usuario: ${err.message}`); }
   };
@@ -149,18 +149,18 @@ export default function AdminPage() {
     e.preventDefault();
     setErrorMasaje(null);
     setSubiendo(true);
-    const supabaseClient = createClient();
+    
     try {
       let imagen_url = null;
       if (nuevoMasaje.imagen_url) {
         const file = nuevoMasaje.imagen_url;
         const filePath = `masajes/${Date.now()}_${file.name}`;
-        const { error: uploadError } = await supabaseClient.storage.from('masajes').upload(filePath, file);
+        const { error: uploadError } = await supabase.storage.from('masajes').upload(filePath, file);
         if (uploadError) throw uploadError;
-        const { data: urlData } = supabaseClient.storage.from('masajes').getPublicUrl(filePath);
+        const { data: urlData } = supabase.storage.from('masajes').getPublicUrl(filePath);
         imagen_url = urlData?.publicUrl;
       }
-      const { error: insertError } = await supabaseClient.from('masajes').insert([{ ...nuevoMasaje, precio: parseFloat(nuevoMasaje.precio), duracion: parseInt(nuevoMasaje.duracion), imagen_url }]);
+      const { error: insertError } = await supabase.from('masajes').insert([{ ...nuevoMasaje, precio: parseFloat(nuevoMasaje.precio), duracion: parseInt(nuevoMasaje.duracion), imagen_url }]);
       if (insertError) throw insertError;
       setNuevoMasaje({ nombre: '', descripcion_corta: '', descripcion_larga: '', precio: '', duracion: '', imagen_url: null });
       await loadData();
@@ -171,7 +171,7 @@ export default function AdminPage() {
   const handleUpdateMasaje = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setEditLoading(true);
-    const supabaseClient = createClient();
+    
     try {
         const updateData: { [key: string]: any } = {
             nombre: editMasaje.nombre,
@@ -183,13 +183,13 @@ export default function AdminPage() {
 
         if (editFile) {
             const filePath = `masajes/${Date.now()}_${editFile.name}`;
-            const { error: uploadError } = await supabaseClient.storage.from('masajes').upload(filePath, editFile);
+            const { error: uploadError } = await supabase.storage.from('masajes').upload(filePath, editFile);
             if (uploadError) throw uploadError;
-            const { data: urlData } = supabaseClient.storage.from('masajes').getPublicUrl(filePath);
+            const { data: urlData } = supabase.storage.from('masajes').getPublicUrl(filePath);
             updateData.imagen_url = urlData.publicUrl;
         }
 
-        const { error } = await supabaseClient.from('masajes').update(updateData).eq('id', editMasaje.id);
+        const { error } = await supabase.from('masajes').update(updateData).eq('id', editMasaje.id);
         if (error) throw error;
         
         setEditModalOpen(false);
@@ -204,7 +204,7 @@ export default function AdminPage() {
     if (!deleteId) return;
     setDeleteLoading(true);
     try {
-      const { error } = await createClient().from('masajes').delete().eq('id', deleteId);
+      const { error } = await supabase.from('masajes').delete().eq('id', deleteId);
       if (error) throw error;
       setDeleteId(null);
       await loadData();
