@@ -1,95 +1,18 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { usePathname } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
-import { FiMenu, FiX, FiUser, FiCalendar, FiSettings } from 'react-icons/fi';
-import type { Database } from '@/types/supabase';
-import { supabase } from '@/utils/supabase/client';
-import { getSessionClient, getUserDetailsClient } from '@/lib/authClient';
+import { FiMenu, FiX, FiUser, FiSettings } from 'react-icons/fi';
+import { useAuth } from '@/hooks/useAuth';
 
 export default function Navbar() {
   const [isOpen, setIsOpen] = useState(false);
-  const [user, setUser] = useState<any>(null);
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
-  const [isAdmin, setIsAdmin] = useState(false);
+  const { user, isLoading, isAdmin, signOut } = useAuth();
   const pathname = usePathname();
-  
-
-  useEffect(() => {
-    const checkUser = async () => {
-      console.log('Verificando usuario en Navbar');
-      const session = await getSessionClient();
-      const currentUser = session?.user || null;
-      setUser(currentUser);
-      
-      // Verificar si el usuario es administrador
-      if (currentUser) {
-        console.log('Usuario autenticado en Navbar:', currentUser.id);
-        const userDetails = await getUserDetailsClient();
-        
-        if (userDetails) {
-          if (
-            typeof userDetails === 'object' &&
-            userDetails !== null &&
-            'rol' in userDetails
-          ) {
-            const safeUser = userDetails as any;
-            console.log('Rol del usuario:', safeUser.rol);
-            setIsAdmin(safeUser.rol === 'admin');
-          } else {
-            setIsAdmin(false);
-          }
-        } else {
-          console.log('No se pudieron obtener detalles del usuario en Navbar');
-        }
-      } else {
-        console.log('No hay usuario autenticado en Navbar');
-      }
-    };
-
-    checkUser();
-
-    const { data: authListener } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
-        console.log('Cambio en el estado de autenticación:', event);
-        const currentUser = session?.user || null;
-        setUser(currentUser);
-        
-        // Verificar si el usuario es administrador cuando cambia el estado de autenticación
-        if (currentUser) {
-          console.log('Usuario autenticado después del cambio:', currentUser.id);
-          const userDetails = await getUserDetailsClient();
-          
-          if (userDetails) {
-            if (
-              typeof userDetails === 'object' &&
-              userDetails !== null &&
-              'rol' in userDetails
-            ) {
-              const safeUser = userDetails as any;
-              console.log('Rol del usuario después del cambio:', safeUser.rol);
-              setIsAdmin(safeUser.rol === 'admin');
-            } else {
-              setIsAdmin(false);
-            }
-          } else {
-            console.log('No se pudieron obtener detalles del usuario después del cambio');
-            setIsAdmin(false);
-          }
-        } else {
-          console.log('No hay usuario autenticado después del cambio');
-          setIsAdmin(false);
-        }
-      }
-    );
-
-    return () => {
-      authListener.subscription.unsubscribe();
-    };
-  }, [supabase]);
 
   const toggleMenu = () => {
     setIsOpen(!isOpen);
@@ -100,18 +23,9 @@ export default function Navbar() {
   };
 
   const handleSignOut = async () => {
-    console.log('Cerrando sesión desde Navbar...');
-    try {
-      await supabase.auth.signOut();
-      console.log('Sesión cerrada correctamente');
-      setIsUserMenuOpen(false);
-      setIsAdmin(false);
-      setUser(null);
-      // Redirigir a la página de inicio
-      window.location.href = '/';
-    } catch (error) {
-      console.error('Error al cerrar sesión:', error);
-    }
+    await signOut();
+    setIsUserMenuOpen(false);
+    window.location.href = '/';
   };
 
   const closeMenus = () => {
@@ -134,10 +48,10 @@ export default function Navbar() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between h-16 items-center">
           <div className="flex-shrink-0 flex items-center">
-  <Image src="/images/logotransparente.png" alt="Logo" width={40} height={40} className="mr-3" />
+            <Image src="/images/logotransparente.png" alt="Logo" width={40} height={40} className="mr-3" />
             <Link href="/" className="text-xl font-bold text-white" onClick={closeMenus}>
-    Aistirkha
-</Link>
+              Aistirkha
+            </Link>
           </div>
 
           {/* Desktop Navigation */}
@@ -154,7 +68,7 @@ export default function Navbar() {
           </div>
 
           <div className="hidden md:flex items-center space-x-4">
-            {user ? (
+            {!isLoading && user ? (
               <div className="relative">
                 <button
                   onClick={toggleUserMenu}
@@ -202,7 +116,7 @@ export default function Navbar() {
                   )}
                 </AnimatePresence>
               </div>
-            ) : (
+            ) : !isLoading ? (
               <div className="flex space-x-4">
                 <Link
                   href="/auth"
@@ -210,14 +124,17 @@ export default function Navbar() {
                 >
                   Iniciar Sesión
                 </Link>
-                
+              </div>
+            ) : (
+              <div className="animate-pulse">
+                <div className="h-4 w-20 bg-gray-200 rounded"></div>
               </div>
             )}
           </div>
 
           {/* Mobile menu button */}
           <div className="md:hidden flex items-center space-x-4">
-            {user && (
+            {!isLoading && user && (
               <Link href="/cliente" className="text-gray-600">
                 <FiUser className="h-6 w-6" />
               </Link>
@@ -254,7 +171,7 @@ export default function Navbar() {
                 </Link>
               ))}
 
-              {user ? (
+              {!isLoading && user ? (
                 <>
                   <Link
                     href="/cliente"
@@ -282,7 +199,7 @@ export default function Navbar() {
                     Cerrar Sesión
                   </button>
                 </>
-              ) : (
+              ) : !isLoading ? (
                 <>
                   <Link
                     href="/auth"
@@ -291,9 +208,8 @@ export default function Navbar() {
                   >
                     Iniciar Sesión
                   </Link>
-                  
                 </>
-              )}
+              ) : null}
             </div>
           </motion.div>
         )}

@@ -1,13 +1,11 @@
 import type { Database } from '@/types/supabase';
-import { supabase } from '@/utils/supabase/client';
+import { supabase, ensureValidSession } from '@/utils/supabase/client';
 
-// ✅ Obtener la sesión
+// ✅ Obtener la sesión con verificación mejorada
 export async function getSessionClient() {
   try {
-    const { data: { session }, error } = await supabase.auth.getSession();
-
-    if (error) throw error;
-
+    const session = await ensureValidSession();
+    
     console.log('getSessionClient - Session:', session ? 'Existe' : 'No existe');
     if (session) {
       console.log('User ID:', session.user.id);
@@ -21,10 +19,10 @@ export async function getSessionClient() {
   }
 }
 
-// ✅ Obtener detalles del usuario
+// ✅ Obtener detalles del usuario con sesión verificada
 export async function getUserDetailsClient() {
   try {
-    const session = await getSessionClient();
+    const session = await ensureValidSession();
 
     if (!session?.user.id) {
       console.log('getUserDetailsClient - No hay sesión de usuario');
@@ -48,4 +46,16 @@ export async function getUserDetailsClient() {
     console.error('Error al obtener detalles del usuario:', error);
     return null;
   }
+}
+
+// ✅ Función para verificar si el usuario está autenticado
+export async function isAuthenticated() {
+  const session = await getSessionClient();
+  return !!session;
+}
+
+// ✅ Función para obtener el usuario actual
+export async function getCurrentUser() {
+  const session = await getSessionClient();
+  return session?.user || null;
 }

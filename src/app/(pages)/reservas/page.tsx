@@ -4,8 +4,8 @@ import React, { useState, useEffect } from 'react';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { supabase } from '@/utils/supabase/client';
-import { getSessionClient } from '@/lib/authClient';
+import { supabase, ensureValidSession } from '@/utils/supabase/client';
+import { useAuth } from '@/hooks/useAuth';
 import { motion, AnimatePresence } from 'framer-motion';
 import DatePicker from 'react-datepicker';
 import { format, addDays, isAfter } from 'date-fns';
@@ -21,14 +21,6 @@ type Masaje = {
   duracion: number;
   precio: number;
   imagen_url: string;
-};
-
-type UserDetails = {
-  id: string;
-  email: string;
-  nombre: string;
-  telefono: string;
-  rol: string;
 };
 
 // Configuración de horarios
@@ -63,10 +55,10 @@ export default function ReservasPage() {
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [user, setUser] = useState<any>(null);
-  const [userDetails, setUserDetails] = useState<UserDetails | null>(null);
   const [timeSlots, setTimeSlots] = useState<{ time: string; available: boolean }[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  
+  const { user, isLoading: authLoading } = useAuth();
 
   const {
     register,
@@ -113,35 +105,11 @@ export default function ReservasPage() {
           })));
         }
 
-        // Verificar sesión del usuario
-        const { data: { session } } = await supabase.auth.getSession();
-        if (!session) {
-          await supabase.auth.refreshSession();
-        }
-        setUser(session?.user ?? null);
-        
-        if (session?.user) {
-          // Obtener detalles del usuario
-          const { data: userData, error: userError } = await supabase
-            .from('usuarios')
-            .select('*')
-            .eq('email', session.user.email)
-            .single();
-          
-          if (!userError && userData) {
-            setUserDetails({
-              id: userData.id,
-              email: userData.email,
-              nombre: userData.nombre,
-              telefono: userData.telefono,
-              rol: userData.rol
-            });
-            
-            // Establecer valores del formulario
-            setValue('nombre', userData.nombre || '');
-            setValue('email', session.user.email || '');
-            setValue('telefono', userData.telefono || '');
-          }
+        // Si el usuario está autenticado, establecer sus datos en el formulario
+        if (user) {
+          setValue('nombre', user.nombre || '');
+          setValue('email', user.email || '');
+          setValue('telefono', user.telefono || '');
         }
       } catch (err) {
         console.error('Error loading data:', err);
@@ -150,29 +118,10 @@ export default function ReservasPage() {
       }
     };
 
-    loadData();
-  }, [setValue]);
-
-  // Recargar solo una vez al volver a la pestaña
-  useEffect(() => {
-    const handleVisibility = () => {
-      const alreadyReloaded = sessionStorage.getItem('reservas_reloaded');
-      if (document.visibilityState === 'visible' && alreadyReloaded !== 'true') {
-        sessionStorage.setItem('reservas_reloaded', 'true');
-        location.reload();
-      }
-    };
-
-    document.addEventListener('visibilitychange', handleVisibility);
-    return () => {
-      document.removeEventListener('visibilitychange', handleVisibility);
-    };
-  }, []);
-
-  // Limpiar la bandera al montar (para permitir próxima recarga)
-  useEffect(() => {
-    sessionStorage.removeItem('reservas_reloaded');
-  }, []);
+    if (!authLoading) {
+      loadData();
+    }
+  }, [setValue, user, authLoading]);
 
   // Generar franjas horarias con disponibilidad
   const generateTimeSlots = (reservedTimes: Set<string>) => {
@@ -341,12 +290,12 @@ const resetForm = () => {
     setStep(1);
     
     // Si tenemos los detalles de un usuario logueado en el estado del componente...
-    if (userDetails) {
+    if (user) {
       // ...reseteamos el formulario, pero pasándole los datos del usuario.
       reset({
-        nombre: userDetails.nombre || '',
-        email: userDetails.email || '',
-        telefono: userDetails.telefono || '',
+        nombre: user.nombre || '',
+        email: user.email || '',
+        telefono: user.telefono || '',
         // También reseteamos los otros campos a su estado inicial
         tipoMasaje: undefined,
         fecha: undefined,

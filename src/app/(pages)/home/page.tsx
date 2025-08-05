@@ -5,7 +5,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
 import { FiCalendar, FiClock, FiAward, FiUsers, FiRefreshCw } from 'react-icons/fi';
-import { supabase } from '@/utils/supabase/client';
+import { supabase, ensureValidSession } from '@/utils/supabase/client';
 
 type MasajePreview = {
   id: string;
@@ -30,12 +30,8 @@ export default function HomePage() {
     try {
       setLoadingState('loading');
       
-      
-      // Verificar sesión activa
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        await supabase.auth.refreshSession();
-      }
+      // Verificar sesión activa usando la nueva función
+      await ensureValidSession();
 
       const { data, error } = await supabase
         .from('masajes')
