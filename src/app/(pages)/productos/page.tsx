@@ -22,8 +22,12 @@ export default function ProductosPage() {
   useEffect(() => {
     async function fetchMasajes() {
       try {
+        console.log('ProductosPage: Starting to fetch masajes...');
+        setLoading(true);
+        
         // Verificar sesión antes de cargar datos
-        await ensureValidSession();
+        const session = await ensureValidSession();
+        console.log('ProductosPage: Session check result:', session ? 'valid' : 'invalid');
         
         const { data, error } = await supabase
           .from('masajes')
@@ -31,12 +35,13 @@ export default function ProductosPage() {
           .order('id', { ascending: true });
 
         if (error) {
-          console.error('Error fetching masajes:', error);
+          console.error('ProductosPage: Error fetching masajes:', error);
         } else {
+          console.log('ProductosPage: Successfully fetched masajes:', data?.length || 0, 'items');
           setMasajes((data as unknown as Masaje[]) || []);
         }
       } catch (error) {
-        console.error('Error in fetchMasajes:', error);
+        console.error('ProductosPage: Error in fetchMasajes:', error);
       } finally {
         setLoading(false);
       }

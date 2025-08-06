@@ -5,6 +5,7 @@ import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import { ThemeProvider } from "@/components/ThemeProvider";
 import { AuthProvider } from "@/components/AuthProvider";
+import DebugPanel from "@/components/DebugPanel";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -36,6 +37,7 @@ export default function RootLayout({
             <Navbar />
             <main className="flex-grow pt-16">{children}</main>
             <Footer />
+            <DebugPanel />
           </body>
         </AuthProvider>
       </ThemeProvider>

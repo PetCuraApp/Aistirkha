@@ -6,7 +6,10 @@ export const SUPABASE_CONFIG = {
     persistSession: true,
     autoRefreshToken: true,
     detectSessionInUrl: true,
-    flowType: 'pkce' as const
+    flowType: 'pkce' as const,
+    storage: typeof window !== 'undefined' ? window.localStorage : undefined,
+    storageKey: 'supabase.auth.token',
+    debug: process.env.NODE_ENV === 'development'
   },
   global: {
     headers: {

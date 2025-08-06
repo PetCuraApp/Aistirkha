@@ -29,9 +29,11 @@ export default function HomePage() {
   const fetchMasajes = async (attempt = 0): Promise<void> => {
     try {
       setLoadingState('loading');
+      console.log('HomePage: Starting to fetch masajes...');
       
       // Verificar sesión activa usando la nueva función
-      await ensureValidSession();
+      const session = await ensureValidSession();
+      console.log('HomePage: Session check result:', session ? 'valid' : 'invalid');
 
       const { data, error } = await supabase
         .from('masajes')
@@ -39,7 +41,12 @@ export default function HomePage() {
         .order('id', { ascending: true })
         .limit(3);
 
-      if (error) throw error;
+      if (error) {
+        console.error('HomePage: Error fetching masajes:', error);
+        throw error;
+      }
+
+      console.log('HomePage: Successfully fetched masajes:', data?.length || 0, 'items');
 
       // Actualizar estado y caché
       setMasajesPreview(data || []);
@@ -49,9 +56,10 @@ export default function HomePage() {
       setRetryCount(0);
       
     } catch (error) {
-      console.error('Error fetching masajes:', error);
+      console.error('HomePage: Error fetching masajes:', error);
       
       if (attempt < MAX_RETRIES - 1) {
+        console.log('HomePage: Retrying... attempt', attempt + 1);
         setRetryCount(prev => prev + 1);
         await new Promise(resolve => setTimeout(resolve, RETRY_DELAY));
         return fetchMasajes(attempt + 1);
@@ -62,9 +70,11 @@ export default function HomePage() {
       const cacheTime = localStorage.getItem('masajesTimestamp');
       
       if (cachedData && cacheTime && (Date.now() - Number(cacheTime) < CACHE_EXPIRY)) {
+        console.log('HomePage: Using cached data');
         setMasajesPreview(JSON.parse(cachedData));
         setLoadingState('success');
       } else {
+        console.log('HomePage: No valid cache available');
         setLoadingState('error');
       }
     }

@@ -19,23 +19,32 @@ export function useAuth() {
     const checkUser = async () => {
       try {
         setIsLoading(true);
+        console.log('useAuth: Checking user session...');
+        
         const session = await getSessionClient();
+        console.log('useAuth: Session result:', session ? 'exists' : 'null');
         
         if (session?.user) {
+          console.log('useAuth: User found, getting details...');
           const userDetails = await getUserDetailsClient();
+          console.log('useAuth: User details:', userDetails);
+          
           if (userDetails) {
             setUser(userDetails as User);
             setIsAdmin(userDetails.rol === 'admin');
+            console.log('useAuth: User set successfully');
           } else {
+            console.log('useAuth: No user details found');
             setUser(null);
             setIsAdmin(false);
           }
         } else {
+          console.log('useAuth: No session found');
           setUser(null);
           setIsAdmin(false);
         }
       } catch (error) {
-        console.error('Error checking user:', error);
+        console.error('useAuth: Error checking user:', error);
         setUser(null);
         setIsAdmin(false);
       } finally {
@@ -47,8 +56,13 @@ export function useAuth() {
 
     const { data: authListener } = supabase.auth.onAuthStateChange(
       async (event, session) => {
+        console.log('useAuth: Auth state change:', event, session ? 'session exists' : 'no session');
+        
         if (session?.user) {
+          console.log('useAuth: Auth state change - getting user details...');
           const userDetails = await getUserDetailsClient();
+          console.log('useAuth: Auth state change - user details:', userDetails);
+          
           if (userDetails) {
             setUser(userDetails as User);
             setIsAdmin(userDetails.rol === 'admin');
@@ -57,6 +71,7 @@ export function useAuth() {
             setIsAdmin(false);
           }
         } else {
+          console.log('useAuth: Auth state change - clearing user');
           setUser(null);
           setIsAdmin(false);
         }
@@ -70,11 +85,13 @@ export function useAuth() {
 
   const signOut = async () => {
     try {
+      console.log('useAuth: Signing out...');
       await supabase.auth.signOut();
       setUser(null);
       setIsAdmin(false);
+      console.log('useAuth: Sign out successful');
     } catch (error) {
-      console.error('Error signing out:', error);
+      console.error('useAuth: Error signing out:', error);
     }
   };
 
