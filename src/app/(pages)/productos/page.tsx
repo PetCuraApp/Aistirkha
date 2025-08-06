@@ -22,6 +22,7 @@ export default function ProductosPage() {
   useEffect(() => {
     async function fetchMasajes() {
       try {
+        console.log('ProductosPage: Starting to fetch masajes...');
         setLoading(true);
         
         // Verificar sesión antes de cargar datos
@@ -35,6 +36,7 @@ export default function ProductosPage() {
         if (error) {
           console.error('ProductosPage: Error fetching masajes:', error);
         } else {
+          console.log('ProductosPage: Successfully fetched masajes:', data?.length || 0, 'items');
           setMasajes((data as unknown as Masaje[]) || []);
         }
       } catch (error) {

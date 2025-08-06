@@ -25,6 +25,8 @@ export async function ensureValidSession() {
       return sessionCache;
     }
     
+    console.log('ensureValidSession: Checking session...');
+    
     const { data: { session }, error } = await supabase.auth.getSession();
     
     if (error) {
@@ -33,8 +35,11 @@ export async function ensureValidSession() {
       return null;
     }
 
+    console.log('ensureValidSession: Session found:', !!session);
+
     // Si no hay sesión, intentar refrescar una sola vez
     if (!session) {
+      console.log('ensureValidSession: No session, attempting refresh...');
       const { data: { session: refreshedSession }, error: refreshError } = await supabase.auth.refreshSession();
       
       if (refreshError) {
@@ -43,6 +48,7 @@ export async function ensureValidSession() {
         return null;
       }
       
+      console.log('ensureValidSession: Refresh result:', !!refreshedSession);
       sessionCache = refreshedSession;
       lastCheck = now;
       return refreshedSession;
@@ -56,6 +62,7 @@ export async function ensureValidSession() {
       
       // Si expira en menos de 5 minutos, refrescar
       if (timeUntilExpiry < 300) {
+        console.log('ensureValidSession: Session expiring soon, refreshing...');
         const { data: { session: refreshedSession }, error: refreshError } = await supabase.auth.refreshSession();
         
         if (refreshError) {
@@ -72,6 +79,7 @@ export async function ensureValidSession() {
     // Actualizar cache
     sessionCache = session;
     lastCheck = now;
+    console.log('ensureValidSession: Session is valid');
     return session;
   } catch (error) {
     console.error('ensureValidSession: Unexpected error:', error);
