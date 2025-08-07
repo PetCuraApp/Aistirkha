@@ -5,10 +5,11 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
-import { FiCalendar, FiUsers, FiDollarSign, FiEdit, FiTrash2, FiCheck, FiX, FiUpload } from 'react-icons/fi';
+import { FiCalendar, FiUsers, FiDollarSign, FiEdit, FiTrash2, FiCheck, FiX, FiUpload, FiVideo } from 'react-icons/fi';
 import { getSessionClient, getUserDetailsClient } from '@/lib/authClient';
 import { supabase } from '@/utils/supabase/client';
 import ReservasSemanal from '@/app/(pages)/admin/ReservasSemanal'; // Asegúrate de que la ruta sea correcta 
+import VideosManager from '@/app/(pages)/admin/VideosManager';
 import type { Reserva } from '@/types/admin';
 
 type Usuario = {
@@ -20,7 +21,7 @@ type Usuario = {
   creado_en: string;
 };
 
-type Tab = 'reservas' | 'usuarios' | 'masajes';
+type Tab = 'reservas' | 'usuarios' | 'masajes' | 'videos';
 
 export default function AdminPage() {
   // Estados originales
@@ -225,6 +226,7 @@ export default function AdminPage() {
             <button onClick={() => setTab('reservas')} className={`${tab === 'reservas' ? 'border-teal-500 text-teal-600' : 'border-transparent text-gray-500 hover:text-gray-700'} py-4 px-6 border-b-2 font-medium text-sm flex items-center`}><FiCalendar className="mr-2" />Reservas</button>
             <button onClick={() => setTab('usuarios')} className={`${tab === 'usuarios' ? 'border-teal-500 text-teal-600' : 'border-transparent text-gray-500 hover:text-gray-700'} py-4 px-6 border-b-2 font-medium text-sm flex items-center`}><FiUsers className="mr-2" />Usuarios</button>
             <button onClick={() => setTab('masajes')} className={`${tab === 'masajes' ? 'border-teal-500 text-teal-600' : 'border-transparent text-gray-500 hover:text-gray-700'} py-4 px-6 border-b-2 font-medium text-sm flex items-center`}><FiDollarSign className="mr-2" />Masajes</button>
+            <button onClick={() => setTab('videos')} className={`${tab === 'videos' ? 'border-teal-500 text-teal-600' : 'border-transparent text-gray-500 hover:text-gray-700'} py-4 px-6 border-b-2 font-medium text-sm flex items-center`}><FiVideo className="mr-2" />Videos</button>
           </nav></div>
           
           <div className="p-4">
@@ -250,7 +252,9 @@ export default function AdminPage() {
                   </div>
                   <div className="overflow-x-auto"><table className="min-w-full divide-y divide-gray-200"><thead className="bg-gray-50"><tr><th className="px-6 py-3 text-left text-xs font-medium">Imagen</th><th className="px-6 py-3 text-left text-xs font-medium">Nombre</th><th className="px-6 py-3 text-left text-xs font-medium">Precio</th><th className="px-6 py-3 text-left text-xs font-medium">Duración</th><th className="px-6 py-3 text-left text-xs font-medium">Acciones</th></tr></thead><tbody className="bg-white divide-y divide-gray-200">{masajes.map(m => (<tr key={m.id}><td className="px-6 py-4"><img src={m.imagen_url || 'https://placehold.co/40x40'} alt={m.nombre} className="h-10 w-10 rounded-full object-cover"/></td><td className="px-6 py-4">{m.nombre}</td><td className="px-6 py-4">${m.precio}</td><td className="px-6 py-4">{m.duracion} min</td><td className="px-6 py-4 text-sm font-medium"><button onClick={() => { setEditMasaje(m); setEditModalOpen(true); }} className="text-indigo-600 hover:text-indigo-900">Editar</button><button onClick={() => setDeleteId(m.id)} className="text-red-600 hover:text-red-900 ml-4">Eliminar</button></td></tr>))}</tbody></table></div>
                 </div>
-             ) : null}
+             )
+             : tab === 'videos' ? <VideosManager />
+             : null}
           </div>
         </div>
       </motion.div>

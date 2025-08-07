@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { motion } from 'framer-motion';
 import { FiCalendar, FiClock, FiAward, FiUsers, FiRefreshCw } from 'react-icons/fi';
 import { supabase, ensureValidSession } from '@/utils/supabase/client';
+import VideoCarousel from '@/components/VideoCarousel';
 
 type MasajePreview = {
   id: string;
@@ -334,6 +335,33 @@ export default function HomePage() {
               </Link>
             </motion.div>
           )}
+        </div>
+      </section>
+
+      {/* Video Carousel Section */}
+      <section className="py-20 bg-gray-50">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <motion.div
+            className="text-center mb-16"
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.5 }}
+          >
+            <h2 className="text-3xl sm:text-4xl font-bold text-gray-900 mb-4">Nuestros Videos</h2>
+            <p className="text-xl text-gray-600 max-w-3xl mx-auto">
+              Descubre nuestros videos de masajes y técnicas terapéuticas.
+            </p>
+          </motion.div>
+          
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.5 }}
+          >
+            <VideoCarousel />
+          </motion.div>
         </div>
       </section>
 
